@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "Bash(curl -s \"https://start.spring.io\" -H \"Accept: application/json\")",
+      "Bash(curl -s \"https://start.spring.io/actuator/info\")",
+      "Bash(rm D:/Java/projects/examin-ai-with-bmad/examin-ai.zip)",
+      "Bash(curl -G https://start.spring.io/starter.zip -d type=maven-project -d language=java -d bootVersion=3.5.13 -d baseDir=examin-ai -d groupId=com.examinai -d artifactId=examin-ai -d name=examin-ai -d javaVersion=21 -d dependencies=web,thymeleaf,security,data-jpa,postgresql,liquibase,mail,validation,actuator -o examin-ai.zip)",
+      "Bash(./mvnw dependency:tree)",
+      "Bash(./mvnw clean *)"
     ]
   }
 }

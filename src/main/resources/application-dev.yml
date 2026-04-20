@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/examinai
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+
+logging:
+  level:
+    com.examinai: debug
+    org.springframework.security: debug
