@@ -24,6 +24,9 @@ class SecurityIntegrationTest {
     @MockBean
     CustomUserDetailsService customUserDetailsService;
 
+    @MockBean
+    UserAccountService userAccountService;
+
     @Test
     void unauthenticatedRedirectsToLogin() throws Exception {
         mockMvc.perform(get("/intern/tasks"))

@@ -9,7 +9,14 @@
       "Bash(./mvnw dependency:tree)",
       "Bash(./mvnw clean *)",
       "Bash(./mvnw test *)",
-      "Bash(git diff *)"
+      "Bash(git diff *)",
+      "Bash(mvn -e exec:java -Dexec.mainClass=\"com.examinai.HashGenerator\" -Dexec.classpathScope=test)",
+      "Bash(mvn test-compile *)",
+      "Bash(mvn exec:java -Dexec.mainClass=\"com.examinai.HashGenerator\" -Dexec.classpathScope=test)",
+      "Bash(grep -E \"\\(admin|mentor|intern|\\\\$2a\\)\")",
+      "Bash(mvn clean *)",
+      "Bash(mvn test *)",
+      "Bash(git stash *)"
     ]
   }
 }

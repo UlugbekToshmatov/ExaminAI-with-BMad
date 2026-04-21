@@ -20,3 +20,12 @@
 - `UserAccount.dateCreated` has no Java-side default value — only set via `@PrePersist`; a manually constructed `UserAccount` not persisted via JPA will have `null` dateCreated (UserAccount.java:32)
 - `task_review.status`, `llm_result`, `mentor_result` are unconstrained `VARCHAR(20)` — add `CHECK` constraints or use a PostgreSQL enum when Story 3+ implements the AI review pipeline (001-init-schema.sql)
 - `UserAccountRepository.findAllByRole()` returns an unbounded list — add `Page<UserAccount>` + `Pageable` overload when Story 1.3 admin UI implements user listing (UserAccountRepository.java:8)
+
+## Deferred from: code review of 1-3-admin-user-account-management-seed-data (2026-04-21)
+
+- Race condition in username uniqueness check — `existsByUsername` + `save` has no DB unique constraint fallback at service layer; concurrent requests can both pass the check and trigger a `ConstraintViolationException` (UserAccountService.java:24-33)
+- BCrypt hashes for seed credentials committed to git history — offline dictionary attack possible for known dev passwords; rotation requires a new changeset (004-seed-data.sql)
+- No reactivate path — account deactivation is irreversible via the UI; restoring an account requires direct DB access; consider a toggle in a future admin story
+- Seed data uses `now()` for all timestamps — non-deterministic values across environments; use a fixed literal (e.g., `'2026-01-01 00:00:00'`) for deterministic seed data
+- Absolute `href` paths in admin templates break under non-root context path deployment; replace with `th:href="@{...}"` (user-list.html:10, user-form.html:37)
+- No password complexity enforcement — single-character passwords are accepted by the service; add minimum length/complexity validation in a future story
