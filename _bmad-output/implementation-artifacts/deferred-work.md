@@ -36,6 +36,18 @@
 - `IllegalArgumentException` messages expose internal DB primary keys in UI flash messages — `"Course not found: 42"` style messages visible to ADMIN/MENTOR users; low risk given authenticated audience, but consider a sanitized user message layer (TaskService.java)
 - `@PreAuthorize` on read methods (`findAll`, `findById`, `findAllCourses`, `findAllMentors`) is partially bypassed for internal calls — `findById` annotation skipped when invoked from `update`/`delete` via `this.findById()`; outer method protection covers the gap but annotation creates false impression of independent security (TaskService.java)
 
+## Deferred from: code review of 2-3-intern-task-list-progress-view (2026-04-21)
+
+- `assertOwnership()` does not null-check `Authentication` returned by `SecurityContextHolder.getContext().getAuthentication()` — NPE if called outside a security context (TaskService.java:126)
+- `TaskReview.dateCreated` has `@Column(nullable=false)` but no `@PrePersist` or `@Column(insertable=false)` — relies on Epic 3 always calling `setDateCreated()` before save; if omitted, DB NOT NULL constraint fires at runtime (TaskReview.java:44)
+- `TaskServiceTest.findForInternByUsername_withNoReviews`: `intern.getId()` is `null`, repository mock uses `any()` — correct argument passing is untested; strengthen with a real ID + `eq()` matcher when Epic 3 adds write-path tests (TaskServiceTest.java:138)
+
+## Deferred from: code review of 3-1-task-submission-form-async-ai-review-pipeline (2026-04-22)
+
+- GitHub token potentially logged via Spring DEBUG HTTP logging — `RestClient` logs `Authorization` headers at DEBUG level when Spring web debug logging is enabled; add a header-masking interceptor or document as a deployment runbook constraint (GitHubClientConfig.java:19)
+- LLM JSON embedded in prose not handled by `LlmOutputSanitizer` — sanitizer strips `<think>` blocks and fenced JSON but cannot extract JSON buried in plain prose text; edge case as model/prompt evolves (LlmOutputSanitizer.java:13)
+- Thread pool rejection silently loses pipeline submission — when `AsyncConfig` executor is saturated, `TaskRejectedException` from `@Async` dispatch propagates through Spring's `afterCommit()` callback and leaves `TaskReview` stuck in PENDING permanently; add a rejection policy or a startup-time `TaskReviewRepository.resetStalePending()` recovery hook (AsyncConfig.java:20)
+
 ## Deferred from: code review of 2-1-course-management (2026-04-21)
 
 - Spring AOP self-invocation: `@PreAuthorize` on `findById()` skipped when called from `update()`/`delete()` — no current security gap (same expression on all methods), but annotation is misleading for in-process callers (CourseService.java:22)

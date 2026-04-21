@@ -1,6 +1,6 @@
 # Story 2.3: Intern Task List & Progress View
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -157,228 +157,40 @@ Then each task is returned with `review = null` in `TaskWithReview` and no NullP
 
 ## Dev Notes
 
-### Critical Context — Read First
+### Implementation snapshot
 
-- **Spring Boot 3.5.13** (not 3.4.2 from architecture docs) — every prior story confirms this
-- **`task_review` table ALREADY EXISTS** in `001-init-schema.sql:30-41` — DO NOT create any new Liquibase changelog
-- **Indexes ALREADY EXIST**: `idx_task_review_intern_id` and `idx_task_review_status` in `003-indexes.sql:4-5`, plus `idx_task_review_mentor_id` at `003-indexes.sql:6` — no new index migration needed
-- **`open-in-view: false`** is set in `application.yml:11` — accessing LAZY-loaded associations outside a `@Transactional` scope throws `LazyInitializationException`. Use `JOIN FETCH` in `TaskRepository.findAllWithCourseOrderByTaskNameAsc()` for eager Course loading
-- **`InternTaskController.java` already exists** as a stub at `com.examinai.task.InternTaskController` — MODIFY it, do not recreate. It has `@RequestMapping("/intern")` at class level
-- **`SecurityIntegrationTest` will FAIL** without `@MockBean TaskService` added — `@WebMvcTest` cannot create `TaskService` (non-web bean); context startup fails without the mock
-- **`fragments/` directory does NOT exist yet** — you must create it; `task-status-card.html` is the first fragment
-- **`th:replace`** with fragment including review-status-badge is in Phase 2 (Epic 3) — do NOT implement `ReviewStatusBadge`, `InternStatusCard`, or `review-polling.js` in this story
-- **Package placement**: `ReviewStatus` and `TaskReview` and `TaskReviewRepository` → `com.examinai.review`; `TaskWithReview` → `com.examinai.task`; `InternTaskController` stays in `com.examinai.task`
+- **Canonical code**: `ReviewStatus`, `TaskReview`, `TaskReviewRepository` in `src/main/java/com/examinai/review/`; `TaskWithReview`, `TaskService.findForInternByUsername`, `InternTaskController` in `src/main/java/com/examinai/task/`; templates under `src/main/resources/templates/fragments/` and `templates/intern/`.
+- **Spring Boot**: use **`pom.xml`** as source of truth (planning docs may still list 3.4.x).
+- **Epic doc vs code**: `epics.md` calls the operation `TaskService.findForIntern()`; the implemented API is **`findForInternByUsername(String)`** only — do not add a second `findForIntern()` unless you refactor all call sites.
+- **`task_review`**: defined in `001-init-schema.sql` (and indexes in `003-indexes.sql`); no new Liquibase file for this story.
+- **Git at validation**: `d385ffc` — *Context for story 2.3 of epic 2 created*
+- **Tracking**: story **Status** and `sprint-status.yaml` use **`review`** after this validation pass.
 
-### `ReviewStatus.java`
+### Cross-story deferrals
 
-```java
-package com.examinai.review;
+`_bmad-output/implementation-artifacts/deferred-work.md` lists follow-ups from earlier stories (e.g. `task_review.status` as unconstrained `VARCHAR`, mentor FK behavior). Epic 3 should reconcile those when the review pipeline lands.
 
-public enum ReviewStatus {
-    PENDING,
-    LLM_EVALUATED,
-    APPROVED,
-    REJECTED,
-    ERROR
-}
-```
+### NFR and UX
 
-### `TaskReview.java`
+- **NFR1** (PRD): server-rendered pages &lt; 1s on internal network — smoke **`GET /intern/tasks`** after a cold start; should be near-instant with SSR.
+- **UX-DR11 / UX-DR5**: card grid + `TaskStatusCard` — satisfied by `task-list.html` + `fragments/task-status-card.html`.
+- **UX-DR14**: extend `layout/base.html`; keep new content under `<main id="main-content">` and do not skip heading levels in this template.
 
-```java
-package com.examinai.review;
+### Latest `TaskReview` per task
 
-import com.examinai.task.Task;
-import com.examinai.user.UserAccount;
-import jakarta.persistence.*;
-import java.time.LocalDateTime;
+Reviews load **newest first** (`findAllByInternIdOrderByDateCreatedDesc`). The `toMap` merge function **`(existing, replacement) -> existing`** keeps the **first** row seen per `task_id` while iterating — because the stream is ordered newest-first, that row is the **latest** review per task. When Epic 3 stores multiple attempts per task, revisit if product needs “history” instead of “latest only” on this page.
 
-@Entity
-@Table(name = "task_review")
-public class TaskReview {
+### Constraints (do not regress)
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+- No new Liquibase changelog for `task_review`.
+- **`open-in-view: false`** — `JOIN FETCH` course on task list queries used by templates.
+- **`@PreAuthorize` on each secured method** — controller `taskList` and service `findForInternByUsername`.
+- Thymeleaf: **`twr.task()`** / **`twr.review()`** (record accessors), not `getTask()`.
+- Do **not** add `ReviewStatusBadge`, `InternStatusCard`, or `review-polling.js` here — Epic 3.
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "task_id", nullable = false)
-    private Task task;
+### `findForInternByUsername` (reference)
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "intern_id", nullable = false)
-    private UserAccount intern;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mentor_id")
-    private UserAccount mentor;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private ReviewStatus status;
-
-    @Column(name = "llm_result")
-    private String llmResult;
-
-    @Column(name = "mentor_result")
-    private String mentorResult;
-
-    @Column(name = "mentor_remarks", columnDefinition = "TEXT")
-    private String mentorRemarks;
-
-    @Column(name = "error_message", length = 500)
-    private String errorMessage;
-
-    @Column(name = "date_created", nullable = false)
-    private LocalDateTime dateCreated;
-
-    public TaskReview() {}
-
-    public Long getId() { return id; }
-    public Task getTask() { return task; }
-    public void setTask(Task task) { this.task = task; }
-    public UserAccount getIntern() { return intern; }
-    public void setIntern(UserAccount intern) { this.intern = intern; }
-    public UserAccount getMentor() { return mentor; }
-    public void setMentor(UserAccount mentor) { this.mentor = mentor; }
-    public ReviewStatus getStatus() { return status; }
-    public void setStatus(ReviewStatus status) { this.status = status; }
-    public String getLlmResult() { return llmResult; }
-    public void setLlmResult(String llmResult) { this.llmResult = llmResult; }
-    public String getMentorResult() { return mentorResult; }
-    public void setMentorResult(String mentorResult) { this.mentorResult = mentorResult; }
-    public String getMentorRemarks() { return mentorRemarks; }
-    public void setMentorRemarks(String mentorRemarks) { this.mentorRemarks = mentorRemarks; }
-    public String getErrorMessage() { return errorMessage; }
-    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
-    public LocalDateTime getDateCreated() { return dateCreated; }
-    public void setDateCreated(LocalDateTime dateCreated) { this.dateCreated = dateCreated; }
-}
-```
-
-**Why `@ManyToOne` for task/intern/mentor**: Needed for JPQL query `tr.intern.id = :internId` in the repository and for `r.getTask().getId()` in the service. Bare Long fields would require native queries. Pattern matches `Task.java` (`@ManyToOne` for course and mentor).
-
-**Why no `@PrePersist` for `dateCreated`**: Epic 3's `ReviewPipelineService` will explicitly set `dateCreated` at submission time. The DB column defaults to `now()` for safety, but the entity sets it explicitly in the pipeline.
-
-### `TaskReviewRepository.java`
-
-```java
-package com.examinai.review;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import java.util.List;
-
-public interface TaskReviewRepository extends JpaRepository<TaskReview, Long> {
-
-    @Query("SELECT tr FROM TaskReview tr WHERE tr.intern.id = :internId ORDER BY tr.dateCreated DESC")
-    List<TaskReview> findAllByInternIdOrderByDateCreatedDesc(@Param("internId") Long internId);
-}
-```
-
-### `TaskWithReview.java`
-
-```java
-package com.examinai.task;
-
-import com.examinai.review.TaskReview;
-
-public record TaskWithReview(Task task, TaskReview review) {}
-```
-
-### Updated `TaskRepository.java`
-
-```java
-package com.examinai.task;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import java.util.List;
-
-public interface TaskRepository extends JpaRepository<Task, Long> {
-    List<Task> findAllByOrderByTaskNameAsc();
-
-    @Query("SELECT t FROM Task t JOIN FETCH t.course ORDER BY t.taskName ASC")
-    List<Task> findAllWithCourseOrderByTaskNameAsc();
-}
-```
-
-### Updated `InternTaskController.java`
-
-```java
-package com.examinai.task;
-
-import com.examinai.review.ReviewStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import java.util.Collections;
-import java.util.List;
-
-@Controller
-@RequestMapping("/intern")
-public class InternTaskController {
-
-    private final TaskService taskService;
-
-    public InternTaskController(TaskService taskService) {
-        this.taskService = taskService;
-    }
-
-    @GetMapping("/tasks")
-    @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
-    public String taskList(Model model, Authentication auth) {
-        List<TaskWithReview> tasks = taskService.findForInternByUsername(auth.getName());
-        if (tasks == null) tasks = Collections.emptyList();
-        int total = tasks.size();
-        long approvedCount = tasks.stream()
-            .filter(twr -> twr.review() != null
-                && twr.review().getStatus() == ReviewStatus.APPROVED)
-            .count();
-        int progressPercent = total > 0 ? (int) (approvedCount * 100L / total) : 0;
-        model.addAttribute("tasks", tasks);
-        model.addAttribute("progressPercent", progressPercent);
-        model.addAttribute("total", total);
-        return "intern/task-list";
-    }
-}
-```
-
-**Why `auth.getName()` and not `SecurityContextHolder`**: Spring MVC auto-injects `Authentication` as a method parameter — cleaner than static holder access. The `auth.getName()` returns the authenticated username from `CustomUserDetailsService`.
-
-**Why null-check on `tasks`**: `@MockBean TaskService` in `SecurityIntegrationTest` returns null by default from Mockito. The null-check prevents NPE in the test when model attributes are computed.
-
-### `TaskService.java` additions
-
-Add `TaskReviewRepository` injection and the new method. The existing constructor:
-
-```java
-public TaskService(TaskRepository taskRepository,
-                   CourseRepository courseRepository,
-                   UserAccountRepository userAccountRepository) {
-```
-
-Becomes:
-
-```java
-private final TaskReviewRepository taskReviewRepository;
-
-public TaskService(TaskRepository taskRepository,
-                   CourseRepository courseRepository,
-                   UserAccountRepository userAccountRepository,
-                   TaskReviewRepository taskReviewRepository) {
-    this.taskRepository = taskRepository;
-    this.courseRepository = courseRepository;
-    this.userAccountRepository = userAccountRepository;
-    this.taskReviewRepository = taskReviewRepository;
-}
-```
-
-Add the new method (with full imports):
+Constructor gains `TaskReviewRepository`; add imports for `TaskReview`, `TaskReviewRepository`, and `Map`. Core logic:
 
 ```java
 @Transactional(readOnly = true)
@@ -401,130 +213,87 @@ public List<TaskWithReview> findForInternByUsername(String username) {
 }
 ```
 
-Add imports at top of file:
-```java
-import com.examinai.review.TaskReview;
-import com.examinai.review.TaskReviewRepository;
-import java.util.Map;
-```
+**Tests**: `TaskServiceTest` needs `@Mock TaskReviewRepository`; `SecurityIntegrationTest` needs `@MockBean TaskService` and `when(taskService.findForInternByUsername(any())).thenReturn(emptyList())` so `@WebMvcTest` can start.
 
-**CRITICAL — `TaskServiceTest` impact**: Adding `TaskReviewRepository` to the constructor means `@InjectMocks` in `TaskServiceTest` will try to inject it. Add `@Mock TaskReviewRepository taskReviewRepository;` to `TaskServiceTest` or all existing tests will fail at context creation (Mockito `@InjectMocks` matches by type — the extra mock just gets injected automatically).
+**Controller**: inject `Authentication`, use `auth.getName()`; null-guard `tasks` for Mockito defaults in web tests.
 
-### `SecurityIntegrationTest.java` changes
+### Architecture compliance (checklist)
 
-```java
-// Add alongside existing @MockBean fields:
-@MockBean
-TaskService taskService;
+1. No new Liquibase for `task_review`.
+2. `@Transactional` only on service methods — not on `@Controller`.
+3. `@PreAuthorize` on `taskList` and `findForInternByUsername`.
+4. Packages: `com.examinai.review` vs `com.examinai.task` as above.
+5. Links in templates: `th:href="@{...}"` for navigational URLs.
+6. Fragment: `templates/fragments/task-status-card.html`.
+7. Record accessors in `task-list.html` for `TaskWithReview`.
+8. JOIN FETCH for tasks that expose `task.course` in the view.
 
-// Add import:
-import com.examinai.task.TaskService;
+### Previous story intelligence (2.2)
 
-// Add @BeforeEach:
-@BeforeEach
-void setUp() {
-    when(taskService.findForInternByUsername(any())).thenReturn(java.util.Collections.emptyList());
-}
+- Seed users `intern` / `intern123`; three tasks under “Spring Boot Fundamentals”.
+- `assertOwnership` in task CRUD used mentor username on LAZY paths — same transactional discipline applies to any future service method touching entities in-session.
 
-// Add imports:
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import org.junit.jupiter.api.BeforeEach;
-```
+### Project structure (delivered)
 
-**Why this is required**: `@WebMvcTest` loads the Spring MVC layer only. Non-web beans (like `TaskService`) are not auto-created. Since `InternTaskController` requires `TaskService` in its constructor, the application context will fail to start without a `@MockBean` for it. This is a mandatory change to keep the existing security tests green.
+**Created**
 
-### Architecture Compliance Rules
+- `src/main/java/com/examinai/review/ReviewStatus.java`
+- `src/main/java/com/examinai/review/TaskReview.java`
+- `src/main/java/com/examinai/review/TaskReviewRepository.java`
+- `src/main/java/com/examinai/task/TaskWithReview.java`
+- `src/main/resources/templates/fragments/task-status-card.html`
 
-1. **NO new Liquibase changelog** — `task_review` table and all its indexes already exist in `001-init-schema.sql` and `003-indexes.sql`
-2. **`@Transactional` on service methods only** — `InternTaskController` MUST NOT have `@Transactional`
-3. **`@PreAuthorize` on every method individually** — `taskList()` in controller AND `findForInternByUsername()` in service
-4. **Package-by-feature** — `ReviewStatus`, `TaskReview`, `TaskReviewRepository` → `com.examinai.review`; `TaskWithReview` → `com.examinai.task`
-5. **Template URLs via `th:href="@{...}"`** — Team Agreement from Epic 1 retro
-6. **Fragment path** → `templates/fragments/task-status-card.html` (architecture spec: `templates/fragments/` directory)
-7. **Record accessor syntax** → `twr.task()` and `twr.review()`, NOT `twr.getTask()` — Java records don't generate `get` prefixed methods
-8. **`open-in-view: false`** → JOIN FETCH in `findAllWithCourseOrderByTaskNameAsc()` is mandatory
+**Modified**
 
-### Previous Story Intelligence (Story 2.2 Learnings)
+- `src/main/java/com/examinai/task/TaskRepository.java`
+- `src/main/java/com/examinai/task/TaskService.java`
+- `src/main/java/com/examinai/task/InternTaskController.java`
+- `src/main/resources/templates/intern/task-list.html`
+- `src/test/java/com/examinai/user/SecurityIntegrationTest.java`
+- `src/test/java/com/examinai/task/TaskServiceTest.java`
 
-1. **Spring Boot 3.5.13** (not 3.4.2) — confirmed in every prior story dev note
-2. **`open-in-view: false`** — confirmed in `application.yml:11`; LAZY access in templates throws `LazyInitializationException`. This story's `findAllWithCourseOrderByTaskNameAsc()` with `JOIN FETCH t.course` prevents the issue.
-3. **No new changelog** — same situation as Story 2.2 (`task` table) and Story 2.1 (`course` table): the `task_review` table is pre-existing in `001-init-schema.sql`
-4. **`@PreAuthorize` on every individual method** — do not use class-level only; confirmed working from all prior stories
-5. **`th:href="@{...}"` always** — Team Agreement from Epic 1 retro; any absolute path causes regressions
-6. **Seed data available**: `intern`/`intern123` login exists; 3 tasks in "Spring Boot Fundamentals" course pre-loaded for manual testing
-7. **Review finding from 2.2**: `assertOwnership()` reads `task.getMentor().getUsername()` — if LAZY and outside transaction, it crashes. Same risk applies here; `findForInternByUsername` uses `@Transactional(readOnly=true)` to keep session open.
+**Out of scope**
 
-### Git Context
+- Liquibase files; `TaskController` (mentor/admin CRUD); `Course*`; `SecurityConfig` except as already configured for `/intern/**`.
 
-Recent commits:
-- `db6e229` — Story 2.2 complete (Task entity, service, controller, templates, tests; ownership check patch applied)
-- `2bba320` — Story 2.1 complete (Course entity, service, controller, templates, tests)
-- `4dc3fb5` — Epic 1 all stories complete
+### Verification checklist
 
-Story 2.3 is the third and final story in Epic 2. After this, run `epic-2-retrospective`.
+1. **`mvn clean test`** — full suite green (includes `SecurityIntegrationTest`, `CourseServiceTest`, `TaskServiceTest`).
+2. **NFR1 smoke**: `GET /intern/tasks` as authenticated intern — responds well under 1s on LAN (rough check is enough).
+3. **Liquibase**: with PostgreSQL, app starts; no new changelog required for this story.
+4. **Manual**: `intern`/`intern123` → `/intern/tasks` — card grid, “Not Started” badges, 0% progress, course names visible; **`admin`/`admin123`** — same view; empty DB — muted empty copy; **768px** — `col-6` behavior per UX-DR13; fragment resolves without template errors.
 
-### Project Structure
+### Review Findings
 
-**Files to CREATE:**
-```
-src/main/java/com/examinai/review/
-├── ReviewStatus.java              ← NEW enum
-├── TaskReview.java                ← NEW entity (table already exists)
-└── TaskReviewRepository.java      ← NEW repository
+- [x] [Review][Patch] Thymeleaf nested `${...}` inside outer `${...}` in `th:style` — all status-conditional borders (AC3/4/5/6) broken at render time; fix by moving entire ternary chain inside one `${...}` and removing inner `${...}` wrappers [task-status-card.html:6-14]
+- [x] [Review][Patch] `TaskReviewRepository` JPQL query lacks `JOIN FETCH tr.task` — with `open-in-view: false`, accessing `r.getTask().getId()` inside `findForInternByUsername` triggers N lazy SELECTs per review [TaskReviewRepository.java:10]
+- [x] [Review][Patch] `toMap` merge function `(existing, replacement) -> existing` is correct only because `findAllByInternIdOrderByDateCreatedDesc` returns newest-first — add a comment documenting this invariant [TaskService.java:117]
+- [x] [Review][Patch] Dead null-check `if (tasks == null) tasks = Collections.emptyList()` — `findForInternByUsername` returns `.toList()` which is never null; remove the guard [InternTaskController.java:27]
+- [x] [Review][Defer] `assertOwnership()` does not null-check `Authentication` from `SecurityContextHolder` [TaskService.java:126] — deferred, pre-existing
+- [x] [Review][Defer] `TaskReview.dateCreated` has `@Column(nullable=false)` but no `@PrePersist` or `insertable=false` — spec-intentional; Epic 3 must always call `setDateCreated()` before save [TaskReview.java:44] — deferred, pre-existing
+- [x] [Review][Defer] `TaskServiceTest`: `intern.getId()` is `null`, `any()` matcher hides incorrect argument passed to repository — acceptable per spec-defined test scope [TaskServiceTest.java:138] — deferred, pre-existing
 
-src/main/java/com/examinai/task/
-└── TaskWithReview.java            ← NEW record DTO
+## Change Log
 
-src/main/resources/templates/fragments/
-└── task-status-card.html          ← NEW fragment (create fragments/ directory)
-```
-
-**Files to MODIFY:**
-```
-src/main/java/com/examinai/task/
-├── TaskRepository.java            ← Add findAllWithCourseOrderByTaskNameAsc()
-├── TaskService.java               ← Add TaskReviewRepository injection + findForInternByUsername()
-└── InternTaskController.java      ← Flesh out stub (add TaskService injection + model logic)
-
-src/main/resources/templates/intern/
-└── task-list.html                 ← Replace stub with card-grid + progress bar
-
-src/test/java/com/examinai/user/
-└── SecurityIntegrationTest.java   ← Add @MockBean TaskService + @BeforeEach stub
-
-src/test/java/com/examinai/task/
-└── TaskServiceTest.java           ← Add @Mock TaskReviewRepository + findForInternByUsername test
-```
-
-**Do NOT touch:**
-- Any Liquibase changelog files — `task_review` and all indexes already exist
-- `TaskController.java` — handles mentor/admin task CRUD only; intern tasks are `InternTaskController`'s responsibility
-- `CourseService.java`, `CourseController.java` — not involved
-- `SecurityConfig.java` — existing `/intern/**` pattern already covers this story
-
-### Verification Checklist
-
-After completing all tasks:
-1. `mvn clean compile` — BUILD SUCCESS, 0 errors
-2. `mvn test` — `SecurityIntegrationTest` (10 tests), `CourseServiceTest` (4 tests), `TaskServiceTest` (5 tests — 4 existing + 1 new) all pass
-3. With local PostgreSQL running: app starts cleanly, Liquibase reports 4 changelogs applied (no new changeset)
-4. Manual: login as `intern`/`intern123` → navigate to `/intern/tasks` → see 3 seed task cards in a card-grid layout
-5. Manual: each card shows grey left border ("Not Started") since no reviews exist yet
-6. Manual: progress bar shows "0%" since no tasks are APPROVED
-7. Manual: card shows task name and course name ("Spring Boot Fundamentals") — LAZY loading does NOT throw
-8. Manual: navigate to `/intern/tasks` — task cards adapt to `col-6` at tablet width (768px)
-9. Manual: login as `admin`/`admin123` → navigate to `/intern/tasks` → same view (admin inherits intern)
-10. Manual: confirm `fragments/task-status-card.html` is included successfully (no Thymeleaf template resolution error)
+- **2026-04-21** — `validate-create-story` pass: Status and sprint set to **review**; Dev Notes tightened; NFR/UX/deferrals/latest-review semantics documented; Dev Agent Record completed.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Cursor Agent (Composer)
 
 ### Debug Log References
 
+None — documentation-only update (validate-create-story).
+
 ### Completion Notes List
 
+- Story file and sprint tracking aligned to **review** after quality validation.
+- Dev Notes reduced to token-efficient, repo-accurate guidance; long duplicate source listings removed in favor of paths and one service-method reference.
+- Documented epic naming (`findForIntern` vs `findForInternByUsername`), NFR1 smoke, UX-DR14, latest-review `toMap` behavior, and link to `deferred-work.md`.
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/2-3-intern-task-list-progress-view.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`

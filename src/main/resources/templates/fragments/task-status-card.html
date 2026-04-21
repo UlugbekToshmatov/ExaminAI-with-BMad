@@ -2,18 +2,22 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="taskStatusCard(task, review)"
-     class="card h-100"
-     th:style="${review == null}
+     class="card h-100 position-relative"
+     th:style="${review == null
          ? 'border-left: 4px solid #dee2e6'
-         : (${review.status.name()} == 'APPROVED')
+         : review.status.name() == 'APPROVED'
              ? 'border-left: 4px solid #198754'
-             : (${review.status.name()} == 'REJECTED')
+             : review.status.name() == 'REJECTED'
                  ? 'border-left: 4px solid #dc3545'
-                 : (${review.status.name()} == 'ERROR')
+                 : review.status.name() == 'ERROR'
                      ? 'border-left: 4px dashed #dc3545'
-                     : 'border-left: 4px solid #ffc107'">
+                     : 'border-left: 4px solid #ffc107'}">
     <div class="card-body">
-        <h5 class="card-title" th:text="${task.taskName}">Task Name</h5>
+        <h5 class="card-title">
+            <a th:href="@{/intern/tasks/{id}(id=${task.id})}"
+               class="text-decoration-none text-body stretched-link"
+               th:text="${task.taskName}">Task Name</a>
+        </h5>
         <p class="card-text text-muted small" th:text="${task.course.courseName}">Course</p>
         <span th:if="${review == null}"
               class="badge bg-secondary">Not Started</span>

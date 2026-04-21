@@ -9,5 +9,6 @@
     <include file="changelogs/002-spring-session.sql" relativeToChangelogFile="true"/>
     <include file="changelogs/003-indexes.sql" relativeToChangelogFile="true"/>
     <include file="changelogs/004-seed-data.sql" relativeToChangelogFile="true"/>
+    <include file="changelogs/005-task-review-github-fields.sql" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

@@ -1,11 +1,18 @@
 package com.examinai.user;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.List;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -18,6 +25,18 @@ class UserAccountServiceTest {
     @Mock PasswordEncoder passwordEncoder;
 
     @InjectMocks UserAccountService userAccountService;
+
+    @BeforeEach
+    void adminSecurityContext() {
+        SecurityContextHolder.setContext(new SecurityContextImpl(
+            new UsernamePasswordAuthenticationToken("admin", "pw",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void createUser_savesWithEncodedPasswordAndActiveTrue() {
@@ -60,6 +79,7 @@ class UserAccountServiceTest {
     @Test
     void deactivate_setsActiveFalseAndSaves() {
         UserAccount account = new UserAccount();
+        account.setUsername("intern1");
         account.setActive(true);
 
         when(userAccountRepository.findById(42L)).thenReturn(Optional.of(account));

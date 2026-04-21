@@ -4,6 +4,8 @@ import com.examinai.task.Task;
 import com.examinai.user.UserAccount;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "task_review")
@@ -44,9 +46,22 @@ public class TaskReview {
     @Column(name = "date_created", nullable = false)
     private LocalDateTime dateCreated;
 
+    @Column(name = "github_repo_owner")
+    private String githubRepoOwner;
+
+    @Column(name = "github_repo_name")
+    private String githubRepoName;
+
+    @Column(name = "github_pr_number")
+    private Integer githubPrNumber;
+
+    @OneToMany(mappedBy = "taskReview", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TaskReviewIssue> issues = new ArrayList<>();
+
     public TaskReview() {}
 
     public Long getId() { return id; }
+    void setId(Long id) { this.id = id; }
     public Task getTask() { return task; }
     public void setTask(Task task) { this.task = task; }
     public UserAccount getIntern() { return intern; }
@@ -65,4 +80,11 @@ public class TaskReview {
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     public LocalDateTime getDateCreated() { return dateCreated; }
     public void setDateCreated(LocalDateTime dateCreated) { this.dateCreated = dateCreated; }
+    public String getGithubRepoOwner() { return githubRepoOwner; }
+    public void setGithubRepoOwner(String githubRepoOwner) { this.githubRepoOwner = githubRepoOwner; }
+    public String getGithubRepoName() { return githubRepoName; }
+    public void setGithubRepoName(String githubRepoName) { this.githubRepoName = githubRepoName; }
+    public Integer getGithubPrNumber() { return githubPrNumber; }
+    public void setGithubPrNumber(Integer githubPrNumber) { this.githubPrNumber = githubPrNumber; }
+    public List<TaskReviewIssue> getIssues() { return issues; }
 }

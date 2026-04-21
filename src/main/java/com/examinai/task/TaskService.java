@@ -106,12 +106,22 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
+    public Task findForInternTaskDetail(String username, Long taskId) {
+        userAccountRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
+        return taskRepository.findByIdWithCourseAndMentor(taskId)
+            .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
     public List<TaskWithReview> findForInternByUsername(String username) {
         UserAccount intern = userAccountRepository.findByUsername(username)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
         List<Task> tasks = taskRepository.findAllWithCourseOrderByTaskNameAsc();
         List<TaskReview> reviews = taskReviewRepository
             .findAllByInternIdOrderByDateCreatedDesc(intern.getId());
+        // query returns newest-first (DESC); keep existing (first seen = latest) per task
         Map<Long, TaskReview> latestByTask = reviews.stream()
             .collect(java.util.stream.Collectors.toMap(
                 r -> r.getTask().getId(),

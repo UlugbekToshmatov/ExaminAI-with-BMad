@@ -6,8 +6,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import java.util.Collections;
+import com.examinai.review.ReviewSubmissionDto;
 import java.util.List;
 
 @Controller
@@ -20,11 +21,18 @@ public class InternTaskController {
         this.taskService = taskService;
     }
 
+    @GetMapping("/tasks/{taskId}")
+    @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
+    public String taskDetail(@PathVariable Long taskId, Model model, Authentication auth) {
+        model.addAttribute("task", taskService.findForInternTaskDetail(auth.getName(), taskId));
+        model.addAttribute("submission", new ReviewSubmissionDto());
+        return "intern/task-detail";
+    }
+
     @GetMapping("/tasks")
     @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
     public String taskList(Model model, Authentication auth) {
         List<TaskWithReview> tasks = taskService.findForInternByUsername(auth.getName());
-        if (tasks == null) tasks = Collections.emptyList();
         int total = tasks.size();
         long approvedCount = tasks.stream()
             .filter(twr -> twr.review() != null

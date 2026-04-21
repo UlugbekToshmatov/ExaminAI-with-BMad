@@ -121,6 +121,21 @@ class TaskServiceTest {
     }
 
     @Test
+    void findForInternTaskDetail_returnsTaskWhenUserAndTaskExist() {
+        UserAccount intern = new UserAccount();
+        intern.setUsername("intern");
+        Task task = new Task();
+        task.setTaskName("One");
+
+        when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
+        when(taskRepository.findByIdWithCourseAndMentor(3L)).thenReturn(Optional.of(task));
+
+        Task result = taskService.findForInternTaskDetail("intern", 3L);
+
+        assertThat(result).isSameAs(task);
+    }
+
+    @Test
     void findForInternByUsername_withNoReviews_returnsTasksWithNullReview() {
         UserAccount intern = new UserAccount();
         intern.setUsername("intern");

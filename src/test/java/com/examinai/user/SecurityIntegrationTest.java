@@ -2,7 +2,12 @@ package com.examinai.user;
 
 import com.examinai.admin.AdminController;
 import com.examinai.config.SecurityConfig;
+import com.examinai.review.InternReviewStatusController;
 import com.examinai.review.MentorReviewController;
+import com.examinai.review.ReviewSubmissionController;
+import com.examinai.review.ReviewPipelineService;
+import com.examinai.review.TaskReview;
+import com.examinai.review.TaskReviewRepository;
 import com.examinai.task.InternTaskController;
 import com.examinai.task.TaskService;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,12 +18,20 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = {InternTaskController.class, MentorReviewController.class, AdminController.class})
+@WebMvcTest(controllers = {
+    InternTaskController.class,
+    MentorReviewController.class,
+    AdminController.class,
+    ReviewSubmissionController.class,
+    InternReviewStatusController.class
+})
 @Import(SecurityConfig.class)
 class SecurityIntegrationTest {
 
@@ -34,9 +47,26 @@ class SecurityIntegrationTest {
     @MockBean
     TaskService taskService;
 
+    @MockBean
+    ReviewPipelineService reviewPipelineService;
+
+    @MockBean
+    TaskReviewRepository taskReviewRepository;
+
     @BeforeEach
     void setUp() {
         when(taskService.findForInternByUsername(any())).thenReturn(java.util.Collections.emptyList());
+        com.examinai.task.Task stubTask = new com.examinai.task.Task();
+        stubTask.setTaskName("stub");
+        com.examinai.course.Course c = new com.examinai.course.Course();
+        c.setCourseName("Course");
+        stubTask.setCourse(c);
+        when(taskService.findForInternTaskDetail(any(), any())).thenReturn(stubTask);
+        com.examinai.user.UserAccount intern = new com.examinai.user.UserAccount();
+        intern.setUsername("user");
+        TaskReview tr = new TaskReview();
+        tr.setIntern(intern);
+        when(taskReviewRepository.findByIdWithInternAndMentor(eq(1L))).thenReturn(Optional.of(tr));
     }
 
     @Test
