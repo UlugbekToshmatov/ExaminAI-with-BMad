@@ -39,6 +39,10 @@
     </nav>
 
     <main id="main-content" class="container py-4" style="max-width: 960px;">
+        <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <span th:text="${errorMessage}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
         <div layout:fragment="content">
             <!-- Page content inserted here by Thymeleaf Layout Dialect -->
         </div>

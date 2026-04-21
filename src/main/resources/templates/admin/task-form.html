@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head><title>Task Form</title></head>
+<body>
+<main id="main-content" layout:fragment="content">
+    <h4 th:text="${taskId != null} ? 'Edit Task' : 'Create Task'">Task</h4>
+
+    <!-- EDIT form -->
+    <form th:if="${taskId != null}"
+          th:action="${baseTaskUrl + '/' + taskId + '/edit'}"
+          th:object="${taskDto}" method="post" class="col-md-6">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <div class="mb-3">
+            <label for="taskName" class="form-label">Task Name</label>
+            <input type="text" class="form-control" id="taskName" th:field="*{taskName}" required
+                   th:classappend="${#fields.hasErrors('taskName')} ? 'is-invalid'">
+            <div th:if="${#fields.hasErrors('taskName')}" class="invalid-feedback"
+                 th:errors="*{taskName}"></div>
+        </div>
+        <div class="mb-3">
+            <label for="taskDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="taskDescription" th:field="*{taskDescription}" rows="4"></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="courseId" class="form-label">Course</label>
+            <select class="form-select" id="courseId" th:field="*{courseId}"
+                    th:classappend="${#fields.hasErrors('courseId')} ? 'is-invalid'">
+                <option value="">-- Select Course --</option>
+                <option th:each="course : ${courses}"
+                        th:value="${course.id}"
+                        th:text="${course.courseName}"></option>
+            </select>
+            <div th:if="${#fields.hasErrors('courseId')}" class="invalid-feedback"
+                 th:errors="*{courseId}"></div>
+        </div>
+        <div class="mb-3">
+            <label for="mentorId" class="form-label">Mentor</label>
+            <select class="form-select" id="mentorId" th:field="*{mentorId}"
+                    th:classappend="${#fields.hasErrors('mentorId')} ? 'is-invalid'">
+                <option value="">-- Select Mentor --</option>
+                <option th:each="mentor : ${mentors}"
+                        th:value="${mentor.id}"
+                        th:text="${mentor.username}"></option>
+            </select>
+            <div th:if="${#fields.hasErrors('mentorId')}" class="invalid-feedback"
+                 th:errors="*{mentorId}"></div>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a th:href="${baseTaskUrl}" class="btn btn-link">Back to Tasks</a>
+    </form>
+
+    <!-- CREATE form -->
+    <form th:unless="${taskId != null}"
+          th:action="${baseTaskUrl}"
+          th:object="${taskDto}" method="post" class="col-md-6">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <div class="mb-3">
+            <label for="taskName" class="form-label">Task Name</label>
+            <input type="text" class="form-control" id="taskName" th:field="*{taskName}" required
+                   th:classappend="${#fields.hasErrors('taskName')} ? 'is-invalid'">
+            <div th:if="${#fields.hasErrors('taskName')}" class="invalid-feedback"
+                 th:errors="*{taskName}"></div>
+        </div>
+        <div class="mb-3">
+            <label for="taskDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="taskDescription" th:field="*{taskDescription}" rows="4"></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="courseId" class="form-label">Course</label>
+            <select class="form-select" id="courseId" th:field="*{courseId}"
+                    th:classappend="${#fields.hasErrors('courseId')} ? 'is-invalid'">
+                <option value="">-- Select Course --</option>
+                <option th:each="course : ${courses}"
+                        th:value="${course.id}"
+                        th:text="${course.courseName}"></option>
+            </select>
+            <div th:if="${#fields.hasErrors('courseId')}" class="invalid-feedback"
+                 th:errors="*{courseId}"></div>
+        </div>
+        <div class="mb-3">
+            <label for="mentorId" class="form-label">Mentor</label>
+            <select class="form-select" id="mentorId" th:field="*{mentorId}"
+                    th:classappend="${#fields.hasErrors('mentorId')} ? 'is-invalid'">
+                <option value="">-- Select Mentor --</option>
+                <option th:each="mentor : ${mentors}"
+                        th:value="${mentor.id}"
+                        th:text="${mentor.username}"></option>
+            </select>
+            <div th:if="${#fields.hasErrors('mentorId')}" class="invalid-feedback"
+                 th:errors="*{mentorId}"></div>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Task</button>
+        <a th:href="${baseTaskUrl}" class="btn btn-link">Back to Tasks</a>
+    </form>
+</main>
+</body>
+</html>

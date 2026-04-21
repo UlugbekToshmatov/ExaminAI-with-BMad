@@ -30,6 +30,12 @@
 - Absolute `href` paths in admin templates break under non-root context path deployment; replace with `th:href="@{...}"` (user-list.html:10, user-form.html:37)
 - No password complexity enforcement — single-character passwords are accepted by the service; add minimum length/complexity validation in a future story
 
+## Deferred from: code review of 2-2-task-management (2026-04-21)
+
+- Orphaned tasks after mentor deletion — `mentor_id` FK in `task` table lacks `ON DELETE CASCADE` or `ON DELETE RESTRICT`; deleting a `UserAccount` with role MENTOR leaves orphaned task rows with dangling FK (001-init-schema.sql:26)
+- `IllegalArgumentException` messages expose internal DB primary keys in UI flash messages — `"Course not found: 42"` style messages visible to ADMIN/MENTOR users; low risk given authenticated audience, but consider a sanitized user message layer (TaskService.java)
+- `@PreAuthorize` on read methods (`findAll`, `findById`, `findAllCourses`, `findAllMentors`) is partially bypassed for internal calls — `findById` annotation skipped when invoked from `update`/`delete` via `this.findById()`; outer method protection covers the gap but annotation creates false impression of independent security (TaskService.java)
+
 ## Deferred from: code review of 2-1-course-management (2026-04-21)
 
 - Spring AOP self-invocation: `@PreAuthorize` on `findById()` skipped when called from `update()`/`delete()` — no current security gap (same expression on all methods), but annotation is misleading for in-process callers (CourseService.java:22)

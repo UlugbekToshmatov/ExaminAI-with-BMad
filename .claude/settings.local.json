@@ -16,7 +16,9 @@
       "Bash(grep -E \"\\(admin|mentor|intern|\\\\$2a\\)\")",
       "Bash(mvn clean *)",
       "Bash(mvn test *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "WebFetch(domain:docs.bmad-method.org)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }
