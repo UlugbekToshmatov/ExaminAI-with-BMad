@@ -18,7 +18,8 @@
       "Bash(mvn test *)",
       "Bash(git stash *)",
       "WebFetch(domain:docs.bmad-method.org)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(git *)"
     ]
   }
 }

@@ -2,6 +2,8 @@ package com.examinai.task;
 
 import com.examinai.course.Course;
 import com.examinai.course.CourseRepository;
+import com.examinai.review.TaskReview;
+import com.examinai.review.TaskReviewRepository;
 import com.examinai.user.Role;
 import com.examinai.user.UserAccount;
 import com.examinai.user.UserAccountRepository;
@@ -12,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class TaskService {
@@ -19,13 +22,16 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final CourseRepository courseRepository;
     private final UserAccountRepository userAccountRepository;
+    private final TaskReviewRepository taskReviewRepository;
 
     public TaskService(TaskRepository taskRepository,
                        CourseRepository courseRepository,
-                       UserAccountRepository userAccountRepository) {
+                       UserAccountRepository userAccountRepository,
+                       TaskReviewRepository taskReviewRepository) {
         this.taskRepository = taskRepository;
         this.courseRepository = courseRepository;
         this.userAccountRepository = userAccountRepository;
+        this.taskReviewRepository = taskReviewRepository;
     }
 
     @Transactional(readOnly = true)
@@ -96,6 +102,25 @@ public class TaskService {
         Task task = findById(id);
         assertOwnership(task);
         taskRepository.delete(task);
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
+    public List<TaskWithReview> findForInternByUsername(String username) {
+        UserAccount intern = userAccountRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
+        List<Task> tasks = taskRepository.findAllWithCourseOrderByTaskNameAsc();
+        List<TaskReview> reviews = taskReviewRepository
+            .findAllByInternIdOrderByDateCreatedDesc(intern.getId());
+        Map<Long, TaskReview> latestByTask = reviews.stream()
+            .collect(java.util.stream.Collectors.toMap(
+                r -> r.getTask().getId(),
+                r -> r,
+                (existing, replacement) -> existing
+            ));
+        return tasks.stream()
+            .map(t -> new TaskWithReview(t, latestByTask.get(t.getId())))
+            .toList();
     }
 
     private void assertOwnership(Task task) {

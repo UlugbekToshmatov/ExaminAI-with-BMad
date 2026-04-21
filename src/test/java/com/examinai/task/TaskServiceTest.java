@@ -2,13 +2,23 @@ package com.examinai.task;
 
 import com.examinai.course.Course;
 import com.examinai.course.CourseRepository;
+import com.examinai.review.TaskReviewRepository;
+import com.examinai.task.TaskWithReview;
+import com.examinai.user.Role;
 import com.examinai.user.UserAccount;
 import com.examinai.user.UserAccountRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -20,7 +30,19 @@ class TaskServiceTest {
     @Mock TaskRepository taskRepository;
     @Mock CourseRepository courseRepository;
     @Mock UserAccountRepository userAccountRepository;
+    @Mock TaskReviewRepository taskReviewRepository;
     @InjectMocks TaskService taskService;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void setAdminContext() {
+        SecurityContextHolder.setContext(new SecurityContextImpl(
+            new UsernamePasswordAuthenticationToken("admin", "password",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))));
+    }
 
     @Test
     void create_savesTaskWithCorrectFields() {
@@ -28,6 +50,7 @@ class TaskServiceTest {
         course.setCourseName("Spring Boot");
         UserAccount mentor = new UserAccount();
         mentor.setUsername("mentor");
+        mentor.setRole(Role.MENTOR);
 
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
         when(userAccountRepository.findById(2L)).thenReturn(Optional.of(mentor));
@@ -50,10 +73,12 @@ class TaskServiceTest {
 
     @Test
     void update_modifiesTaskFieldsAndSaves() {
+        setAdminContext();
         Course newCourse = new Course();
         newCourse.setCourseName("New Course");
         UserAccount newMentor = new UserAccount();
         newMentor.setUsername("new_mentor");
+        newMentor.setRole(Role.MENTOR);
 
         Task existing = new Task();
         existing.setTaskName("Old Name");
@@ -77,6 +102,7 @@ class TaskServiceTest {
 
     @Test
     void delete_callsRepositoryDelete() {
+        setAdminContext();
         Task existing = new Task();
         when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
 
@@ -92,5 +118,27 @@ class TaskServiceTest {
         assertThatThrownBy(() -> taskService.findById(99L))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Task not found");
+    }
+
+    @Test
+    void findForInternByUsername_withNoReviews_returnsTasksWithNullReview() {
+        UserAccount intern = new UserAccount();
+        intern.setUsername("intern");
+
+        Task task1 = new Task();
+        task1.setTaskName("Build REST API");
+        Course course = new Course();
+        course.setCourseName("Spring Boot");
+        task1.setCourse(course);
+
+        when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
+        when(taskRepository.findAllWithCourseOrderByTaskNameAsc()).thenReturn(List.of(task1));
+        when(taskReviewRepository.findAllByInternIdOrderByDateCreatedDesc(any())).thenReturn(Collections.emptyList());
+
+        List<TaskWithReview> result = taskService.findForInternByUsername("intern");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).task()).isSameAs(task1);
+        assertThat(result.get(0).review()).isNull();
     }
 }

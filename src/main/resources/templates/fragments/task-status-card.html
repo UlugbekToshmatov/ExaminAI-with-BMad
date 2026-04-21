@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="taskStatusCard(task, review)"
+     class="card h-100"
+     th:style="${review == null}
+         ? 'border-left: 4px solid #dee2e6'
+         : (${review.status.name()} == 'APPROVED')
+             ? 'border-left: 4px solid #198754'
+             : (${review.status.name()} == 'REJECTED')
+                 ? 'border-left: 4px solid #dc3545'
+                 : (${review.status.name()} == 'ERROR')
+                     ? 'border-left: 4px dashed #dc3545'
+                     : 'border-left: 4px solid #ffc107'">
+    <div class="card-body">
+        <h5 class="card-title" th:text="${task.taskName}">Task Name</h5>
+        <p class="card-text text-muted small" th:text="${task.course.courseName}">Course</p>
+        <span th:if="${review == null}"
+              class="badge bg-secondary">Not Started</span>
+        <span th:if="${review != null and review.status.name() == 'APPROVED'}"
+              class="badge bg-success">Approved</span>
+        <span th:if="${review != null and (review.status.name() == 'PENDING' or review.status.name() == 'LLM_EVALUATED')}"
+              class="badge bg-warning text-dark">In Review</span>
+        <span th:if="${review != null and review.status.name() == 'REJECTED'}"
+              class="badge bg-danger">Rejected</span>
+        <span th:if="${review != null and review.status.name() == 'ERROR'}"
+              class="badge bg-danger">Review Failed</span>
+    </div>
+</div>
+</body>
+</html>
