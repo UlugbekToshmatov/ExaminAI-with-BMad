@@ -33,4 +33,16 @@ public interface TaskReviewRepository extends JpaRepository<TaskReview, Long> {
         WHERE tr.id = :id
         """)
     Optional<TaskReview> findByIdForLlmPersistence(@Param("id") Long id);
+
+    @Query("SELECT tr FROM TaskReview tr JOIN FETCH tr.intern i WHERE tr.id = :id")
+    Optional<TaskReview> findByIdWithInternForStatusJson(@Param("id") Long id);
+
+    @Query("""
+        SELECT DISTINCT tr FROM TaskReview tr
+        JOIN FETCH tr.task t
+        LEFT JOIN FETCH t.course
+        JOIN FETCH tr.intern
+        WHERE tr.id = :id
+        """)
+    Optional<TaskReview> findByIdForInternStatusPage(@Param("id") Long id);
 }

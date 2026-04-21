@@ -28,6 +28,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/login", "/logout").permitAll()
                 .requestMatchers("/intern/**").hasAnyRole("INTERN", "ADMIN")
+                .requestMatchers("/reviews/**").hasAnyRole("INTERN", "ADMIN")
                 .requestMatchers("/mentor/**").hasAnyRole("MENTOR", "ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

@@ -8,6 +8,7 @@ import com.examinai.review.ReviewSubmissionController;
 import com.examinai.review.ReviewPipelineService;
 import com.examinai.review.TaskReview;
 import com.examinai.review.TaskReviewRepository;
+import com.examinai.review.ReviewStatus;
 import com.examinai.task.InternTaskController;
 import com.examinai.task.TaskService;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,8 +66,10 @@ class SecurityIntegrationTest {
         com.examinai.user.UserAccount intern = new com.examinai.user.UserAccount();
         intern.setUsername("user");
         TaskReview tr = new TaskReview();
+        tr.setStatus(ReviewStatus.PENDING);
         tr.setIntern(intern);
-        when(taskReviewRepository.findByIdWithInternAndMentor(eq(1L))).thenReturn(Optional.of(tr));
+        tr.setTask(stubTask);
+        when(taskReviewRepository.findByIdForInternStatusPage(eq(1L))).thenReturn(Optional.of(tr));
     }
 
     @Test

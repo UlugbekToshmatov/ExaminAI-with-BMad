@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<body>
+<div th:fragment="statusBadge(status)">
+    <th:block th:switch="${status.name()}">
+        <div th:case="'PENDING'" class="review-status-badge-host" th:attr="aria-live='polite'">
+            <span class="badge bg-secondary d-inline-flex align-items-center gap-1">
+                <span class="review-status-badge-spinner spinner-border spinner-border-sm d-none" aria-hidden="true" role="status" aria-label="Loading"></span>
+                <span class="review-status-badge-label" th:text="${status.getDisplayLabel()}">Submitted</span>
+            </span>
+        </div>
+        <div th:case="'LLM_EVALUATED'" class="review-status-badge-host" th:attr="aria-live='polite'">
+            <span class="badge text-bg-warning d-inline-flex align-items-center gap-1">
+                <span class="review-status-badge-spinner spinner-border spinner-border-sm" role="status" aria-label="Loading"></span>
+                <span class="review-status-badge-label" th:text="${status.getDisplayLabel()}">Awaiting Mentor Review</span>
+            </span>
+        </div>
+        <div th:case="'APPROVED'" class="review-status-badge-host" th:attr="aria-live='polite'">
+            <span class="badge text-bg-success d-inline-flex align-items-center gap-1">
+                <span class="review-status-badge-spinner spinner-border spinner-border-sm d-none" aria-hidden="true" role="status" aria-label="Loading"></span>
+                <span class="review-status-badge-label" th:text="${status.getDisplayLabel()}">Approved</span>
+            </span>
+        </div>
+        <div th:case="'REJECTED'" class="review-status-badge-host" th:attr="aria-live='polite'">
+            <span class="badge text-bg-danger d-inline-flex align-items-center gap-1">
+                <span class="review-status-badge-spinner spinner-border spinner-border-sm d-none" aria-hidden="true" role="status" aria-label="Loading"></span>
+                <span class="review-status-badge-label" th:text="${status.getDisplayLabel()}">Rejected</span>
+            </span>
+        </div>
+        <div th:case="'ERROR'" class="review-status-badge-host" th:attr="aria-live='assertive'">
+            <span class="badge border border-2 border-danger text-danger bg-body-secondary d-inline-flex align-items-center gap-1">
+                <span class="review-status-badge-spinner spinner-border spinner-border-sm d-none" aria-hidden="true" role="status" aria-label="Loading"></span>
+                <span class="review-status-badge-label" th:text="${status.getDisplayLabel()}">Review Failed</span>
+            </span>
+        </div>
+        <div th:case="*" class="review-status-badge-host" th:attr="aria-live='polite'">
+            <span class="badge bg-secondary d-inline-flex align-items-center gap-1">
+                <span class="review-status-badge-label" th:text="${status.name()}">Unknown</span>
+            </span>
+        </div>
+    </th:block>
+</div>
+</body>
+</html>

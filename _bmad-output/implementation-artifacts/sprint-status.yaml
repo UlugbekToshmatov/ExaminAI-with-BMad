@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-20
-last_updated: 2026-04-22 # story 3-1 → done
+last_updated: 2026-04-22 # story 3-2 → done
 project: examin-ai-with-bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -59,7 +59,7 @@ development_status:
   # Epic 3: Intern Submission & AI Review Pipeline
   epic-3: in-progress
   3-1-task-submission-form-async-ai-review-pipeline: done
-  3-2-review-status-polling-live-status-updates: backlog
+  3-2-review-status-polling-live-status-updates: done
   3-3-error-state-handling-submission-history-resubmit: backlog
   epic-3-retrospective: optional
 

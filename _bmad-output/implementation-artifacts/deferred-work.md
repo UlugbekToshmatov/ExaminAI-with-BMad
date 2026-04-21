@@ -48,6 +48,23 @@
 - LLM JSON embedded in prose not handled by `LlmOutputSanitizer` — sanitizer strips `<think>` blocks and fenced JSON but cannot extract JSON buried in plain prose text; edge case as model/prompt evolves (LlmOutputSanitizer.java:13)
 - Thread pool rejection silently loses pipeline submission — when `AsyncConfig` executor is saturated, `TaskRejectedException` from `@Async` dispatch propagates through Spring's `afterCommit()` callback and leaves `TaskReview` stuck in PENDING permanently; add a rejection policy or a startup-time `TaskReviewRepository.resetStalePending()` recovery hook (AsyncConfig.java:20)
 
+## Deferred from: code review of 3-2-review-status-polling-live-status-updates (2026-04-22)
+
+- Inconsistent 404/403 between HTML and JSON endpoints — by spec design; enumeration risk accepted per epic AC (controllers)
+- Stale fetch race — out-of-order tick responses can overwrite newer state (review-polling.js)
+- `label` element null check missing between polling ticks (review-polling.js:14)
+- `tr.getIntern()` null guard missing in `ReviewStatusController` — NPE leaks as 500 (ReviewStatusController.java:29)
+- `tr.getStatus()` null guard missing in `ReviewStatusController` (ReviewStatusController.java:32)
+- `tr.getIntern()` null guard missing in `InternReviewStatusController` (InternReviewStatusController.java:30)
+- `tr.getId()` null unboxed into primitive `long` in `ReviewStatusResponse` (ReviewStatusController.java:34)
+- INNER JOIN on `tr.intern` in `findByIdWithInternForStatusJson` — orphaned intern causes silent 404 (TaskReviewRepository.java:37)
+- `data.displayLabel` null/undefined guard missing in polling JS (review-polling.js:14)
+- Primitive `long` in `ReviewStatusResponse` — JS precision loss for IDs > 2^53 (ReviewStatusResponse.java)
+- Duplicate ownership-check logic across both controllers — extract to shared policy component (controllers)
+- Repository query naming inconsistency — three different suffixing conventions (TaskReviewRepository.java)
+- No polling back-off or jitter — infinite polling on stuck reviews (review-polling.js)
+- APPROVED/REJECTED/ERROR badge cases include dead hidden-spinner elements — terminal states, spinner never shown (review-status-badge.html)
+
 ## Deferred from: code review of 2-1-course-management (2026-04-21)
 
 - Spring AOP self-invocation: `@PreAuthorize` on `findById()` skipped when called from `update()`/`delete()` — no current security gap (same expression on all methods), but annotation is misleading for in-process callers (CourseService.java:22)

@@ -23,14 +23,14 @@ public class InternReviewStatusController {
     @GetMapping("/{reviewId}")
     @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
     public String reviewStatus(@PathVariable Long reviewId, Authentication auth, Model model) {
-        TaskReview tr = taskReviewRepository.findByIdWithInternAndMentor(reviewId)
+        TaskReview tr = taskReviewRepository.findByIdForInternStatusPage(reviewId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         boolean admin = auth.getAuthorities().stream()
             .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
         if (!admin && !tr.getIntern().getUsername().equals(auth.getName())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        model.addAttribute("reviewId", reviewId);
+        model.addAttribute("review", tr);
         return "intern/review-status";
     }
 }

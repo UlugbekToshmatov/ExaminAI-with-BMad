@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<body>
+<div th:fragment="internStatusCard(review)" class="card border-light shadow-sm mb-3"
+     th:attr="data-review-id=${review.id},data-initial-status=${review.status.name()}">
+    <div class="card-body">
+        <h4 class="h5 card-title">Review status</h4>
+        <p class="text-muted small mb-1" th:text="${review.task.taskName}">Task name</p>
+        <p class="text-muted small mb-2" th:text="${review.task.course.courseName}">Course</p>
+        <div th:replace="~{fragments/review-status-badge :: statusBadge(${review.status})}"></div>
+        <p class="text-muted small mt-3 mb-0"
+           th:if="${review.status.name() == 'PENDING' or review.status.name() == 'LLM_EVALUATED'}">
+            Checking status…
+        </p>
+    </div>
+    <div class="card-footer bg-body-tertiary text-muted small">
+        Reference: <span th:text="${review.id}">0</span>
+    </div>
+</div>
+</body>
+</html>
