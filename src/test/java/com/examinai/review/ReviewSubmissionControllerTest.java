@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.eq;
+import java.util.List;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -58,6 +59,7 @@ class ReviewSubmissionControllerTest {
         course.setCourseName("C");
         task.setCourse(course);
         when(taskService.findForInternTaskDetail("user", 1L)).thenReturn(task);
+        when(taskService.findSubmissionHistoryForInternTask("user", 1L)).thenReturn(List.of());
 
         mockMvc.perform(post("/intern/tasks/1/submit")
                 .with(csrf())
@@ -66,5 +68,7 @@ class ReviewSubmissionControllerTest {
                 .param("prNumber", "42"))
             .andExpect(status().isOk())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("intern/task-detail"));
+
+        verify(taskService).findSubmissionHistoryForInternTask("user", 1L);
     }
 }

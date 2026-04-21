@@ -26,6 +26,7 @@ spring:
             enable: true
   ai:
     ollama:
+      # NFR13: Ollama chat HTTP read timeout is capped at 120s in com.examinai.config.AIConfig (no separate starter property).
       base-url: ${OLLAMA_BASE_URL:http://ollama:11434}
 
 github:

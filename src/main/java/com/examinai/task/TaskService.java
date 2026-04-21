@@ -113,6 +113,19 @@ public class TaskService {
             .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
     }
 
+    /**
+     * All submission attempts for this intern on the task, newest first (for history list / attempt numbering).
+     */
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
+    public List<TaskReview> findSubmissionHistoryForInternTask(String username, Long taskId) {
+        UserAccount intern = userAccountRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
+        taskRepository.findByIdWithCourseAndMentor(taskId)
+            .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+        return taskReviewRepository.findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(taskId, intern.getId());
+    }
+
     @Transactional(readOnly = true)
     @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
     public List<TaskWithReview> findForInternByUsername(String username) {

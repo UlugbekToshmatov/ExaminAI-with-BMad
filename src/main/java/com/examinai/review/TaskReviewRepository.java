@@ -42,7 +42,10 @@ public interface TaskReviewRepository extends JpaRepository<TaskReview, Long> {
         JOIN FETCH tr.task t
         LEFT JOIN FETCH t.course
         JOIN FETCH tr.intern
+        LEFT JOIN FETCH tr.issues
         WHERE tr.id = :id
         """)
     Optional<TaskReview> findByIdForInternStatusPage(@Param("id") Long id);
+
+    List<TaskReview> findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(Long taskId, Long internId);
 }

@@ -26,6 +26,7 @@ public class InternTaskController {
     public String taskDetail(@PathVariable Long taskId, Model model, Authentication auth) {
         model.addAttribute("task", taskService.findForInternTaskDetail(auth.getName(), taskId));
         model.addAttribute("submission", new ReviewSubmissionDto());
+        model.addAttribute("submissionHistory", taskService.findSubmissionHistoryForInternTask(auth.getName(), taskId));
         return "intern/task-detail";
     }
 

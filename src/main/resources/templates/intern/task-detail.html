@@ -55,6 +55,27 @@
             <a class="btn btn-outline-secondary ms-2" th:href="@{/intern/tasks}">Cancel</a>
         </div>
     </form>
+
+    <h5 class="mt-5 mb-3">Submission history</h5>
+    <p class="text-muted small mb-2" th:if="${submissionHistory == null or submissionHistory.isEmpty()}">No submissions yet.</p>
+    <div class="list-group" th:if="${submissionHistory != null and !submissionHistory.isEmpty()}">
+        <div class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2"
+             th:each="entry, iterStat : ${submissionHistory}"
+             th:with="attemptNum=${#lists.size(submissionHistory) - iterStat.index}">
+            <div class="flex-grow-1">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="fw-semibold" th:text="'Attempt ' + ${attemptNum}">Attempt 1</span>
+                    <div th:replace="~{fragments/review-status-badge :: statusBadge(${entry.status})}"></div>
+                </div>
+                <div class="small text-muted"
+                     th:text="${#temporals.format(entry.dateCreated, 'dd MMM yyyy HH:mm', T(java.util.Locale).ENGLISH)}">1 Jan 2026 12:00</div>
+                <div class="small mt-1" th:if="${entry.mentorRemarks != null and !entry.mentorRemarks.isBlank()}">
+                    <span class="text-muted">Mentor remarks:</span>
+                    <span th:text="${entry.mentorRemarks}">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </main>
 </body>
 </html>

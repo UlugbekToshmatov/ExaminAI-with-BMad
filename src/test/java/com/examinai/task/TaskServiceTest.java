@@ -17,6 +17,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.test.util.ReflectionTestUtils;
+import com.examinai.review.ReviewStatus;
+import com.examinai.review.TaskReview;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +46,12 @@ class TaskServiceTest {
         SecurityContextHolder.setContext(new SecurityContextImpl(
             new UsernamePasswordAuthenticationToken("admin", "password",
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))));
+    }
+
+    private void setInternContext() {
+        SecurityContextHolder.setContext(new SecurityContextImpl(
+            new UsernamePasswordAuthenticationToken("intern", "password",
+                List.of(new SimpleGrantedAuthority("ROLE_INTERN")))));
     }
 
     @Test
@@ -133,6 +143,31 @@ class TaskServiceTest {
         Task result = taskService.findForInternTaskDetail("intern", 3L);
 
         assertThat(result).isSameAs(task);
+    }
+
+    @Test
+    void findSubmissionHistoryForInternTask_newestFirst() {
+        setInternContext();
+        UserAccount intern = new UserAccount();
+        intern.setUsername("intern");
+        ReflectionTestUtils.setField(intern, "id", 1L);
+        Task task = new Task();
+        task.setTaskName("T");
+        TaskReview older = new TaskReview();
+        older.setStatus(ReviewStatus.ERROR);
+        older.setDateCreated(LocalDateTime.of(2026, 1, 1, 10, 0));
+        TaskReview newer = new TaskReview();
+        newer.setStatus(ReviewStatus.PENDING);
+        newer.setDateCreated(LocalDateTime.of(2026, 2, 1, 10, 0));
+
+        when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
+        when(taskRepository.findByIdWithCourseAndMentor(3L)).thenReturn(Optional.of(task));
+        when(taskReviewRepository.findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(eq(3L), eq(1L)))
+            .thenReturn(List.of(newer, older));
+
+        List<TaskReview> history = taskService.findSubmissionHistoryForInternTask("intern", 3L);
+
+        assertThat(history).containsExactly(newer, older);
     }
 
     @Test

@@ -10,12 +10,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.fasterxml.jackson.core.JsonParseException;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
+import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -94,5 +103,108 @@ class ReviewPipelineServiceTest {
         reviewPipelineService.runPipeline(1L);
 
         verify(reviewPersistenceService).markPipelineError(eq(1L), org.mockito.ArgumentMatchers.contains("boom"));
+    }
+
+    @Test
+    void runPipeline_github404_setsExactUserMessage() {
+        TaskReview tr = reviewStub();
+        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
+        when(gitHubClient.getPrDiff("a", "b", 9)).thenThrow(
+            HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found",
+                null, null, StandardCharsets.UTF_8));
+
+        reviewPipelineService.runPipeline(8L);
+
+        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_GITHUB_404);
+        verify(reviewPersistenceService, never()).saveLlmSuccess(any(), any());
+    }
+
+    @Test
+    void runPipeline_github403_setsExactUserMessage() {
+        TaskReview tr = reviewStub();
+        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
+        when(gitHubClient.getPrDiff("a", "b", 9)).thenThrow(
+            HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden",
+                null, null, StandardCharsets.UTF_8));
+
+        reviewPipelineService.runPipeline(8L);
+
+        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_GITHUB_403);
+    }
+
+    @Test
+    void runPipeline_github429_setsExactUserMessage() {
+        TaskReview tr = reviewStub();
+        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
+        when(gitHubClient.getPrDiff("a", "b", 9)).thenThrow(
+            HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "Too Many",
+                null, null, StandardCharsets.UTF_8));
+
+        reviewPipelineService.runPipeline(8L);
+
+        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_GITHUB_429);
+    }
+
+    @Test
+    void runPipeline_llmReadTimeout_setsExactUserMessage() {
+        TaskReview tr = reviewStub();
+        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
+        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
+        when(llmReviewService.review("desc", "diff")).thenThrow(new ResourceAccessException("Read timed out"));
+
+        reviewPipelineService.runPipeline(8L);
+
+        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_TIMEOUT);
+    }
+
+    @Test
+    void runPipeline_llmSocketTimeout_setsExactUserMessage() {
+        TaskReview tr = reviewStub();
+        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
+        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
+        doAnswer(inv -> {
+            throw new RuntimeException(new SocketTimeoutException("timeout"));
+        }).when(llmReviewService).review(anyString(), anyString());
+
+        reviewPipelineService.runPipeline(8L);
+
+        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_TIMEOUT);
+    }
+
+    @Test
+    void runPipeline_llmParseFailure_setsExactUserMessage() {
+        TaskReview tr = reviewStub();
+        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
+        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
+        when(llmReviewService.review("desc", "diff"))
+            .thenThrow(new RuntimeException(new JsonParseException(null, "bad json")));
+
+        reviewPipelineService.runPipeline(8L);
+
+        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_PARSE);
+    }
+
+    @Test
+    void runPipeline_llmNullFeedbackIllegalState_setsExactUserMessage() {
+        TaskReview tr = reviewStub();
+        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
+        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
+        when(llmReviewService.review("desc", "diff"))
+            .thenThrow(new IllegalStateException("LLM output could not be parsed into ReviewFeedback: {}"));
+
+        reviewPipelineService.runPipeline(8L);
+
+        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_PARSE);
+    }
+
+    private static TaskReview reviewStub() {
+        Task task = new Task();
+        task.setTaskDescription("desc");
+        TaskReview tr = new TaskReview();
+        tr.setTask(task);
+        tr.setGithubRepoOwner("a");
+        tr.setGithubRepoName("b");
+        tr.setGithubPrNumber(9);
+        return tr;
     }
 }

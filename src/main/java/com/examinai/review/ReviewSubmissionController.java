@@ -33,6 +33,7 @@ public class ReviewSubmissionController {
                          Authentication auth) {
         if (bindingResult.hasErrors()) {
             model.addAttribute("task", taskService.findForInternTaskDetail(auth.getName(), taskId));
+            model.addAttribute("submissionHistory", taskService.findSubmissionHistoryForInternTask(auth.getName(), taskId));
             return "intern/task-detail";
         }
         Long reviewId = reviewPipelineService.submitPendingReview(

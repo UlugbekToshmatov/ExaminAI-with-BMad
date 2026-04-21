@@ -1,0 +1,564 @@
+﻿diff --git a/_bmad-output/implementation-artifacts/sprint-status.yaml b/_bmad-output/implementation-artifacts/sprint-status.yaml
+index 9f2002b..abcd5f0 100644
+--- a/_bmad-output/implementation-artifacts/sprint-status.yaml
++++ b/_bmad-output/implementation-artifacts/sprint-status.yaml
+@@ -35,7 +35,7 @@
+ # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+ 
+ generated: 2026-04-20
+-last_updated: 2026-04-22 # story 3-2 ΓåÆ done
++last_updated: 2026-04-22 # story 3-3 ΓåÆ review
+ project: examin-ai-with-bmad
+ project_key: NOKEY
+ tracking_system: file-system
+@@ -60,7 +60,7 @@ development_status:
+   epic-3: in-progress
+   3-1-task-submission-form-async-ai-review-pipeline: done
+   3-2-review-status-polling-live-status-updates: done
+-  3-3-error-state-handling-submission-history-resubmit: backlog
++  3-3-error-state-handling-submission-history-resubmit: review
+   epic-3-retrospective: optional
+ 
+   # Epic 4: Mentor Review & Final Decision
+diff --git a/src/main/java/com/examinai/review/InternReviewStatusController.java b/src/main/java/com/examinai/review/InternReviewStatusController.java
+index 79b5ece..054714e 100644
+--- a/src/main/java/com/examinai/review/InternReviewStatusController.java
++++ b/src/main/java/com/examinai/review/InternReviewStatusController.java
+@@ -31,6 +31,7 @@ public class InternReviewStatusController {
+             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+         }
+         model.addAttribute("review", tr);
++        model.addAttribute("submission", new ReviewSubmissionDto());
+         return "intern/review-status";
+     }
+ }
+diff --git a/src/main/java/com/examinai/review/ReviewPipelineService.java b/src/main/java/com/examinai/review/ReviewPipelineService.java
+index 26f3e35..76e0fb3 100644
+--- a/src/main/java/com/examinai/review/ReviewPipelineService.java
++++ b/src/main/java/com/examinai/review/ReviewPipelineService.java
+@@ -4,18 +4,29 @@ import com.examinai.task.Task;
+ import com.examinai.task.TaskRepository;
+ import com.examinai.user.UserAccount;
+ import com.examinai.user.UserAccountRepository;
++import com.fasterxml.jackson.core.JsonProcessingException;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ import org.springframework.context.ApplicationEventPublisher;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
++import org.springframework.web.client.ResourceAccessException;
++import org.springframework.web.client.RestClientResponseException;
++import java.net.SocketTimeoutException;
+ import java.time.LocalDateTime;
++import java.util.concurrent.TimeoutException;
+ 
+ @Service
+ public class ReviewPipelineService {
+ 
+     private static final Logger log = LoggerFactory.getLogger(ReviewPipelineService.class);
+ 
++    static final String MSG_GITHUB_404 = "GitHub PR not found. Check your PR number and resubmit.";
++    static final String MSG_GITHUB_403 = "GitHub token has insufficient permissions.";
++    static final String MSG_GITHUB_429 = "GitHub API rate limited. Wait a few minutes and resubmit.";
++    static final String MSG_LLM_TIMEOUT = "AI review timed out. Try resubmitting.";
++    static final String MSG_LLM_PARSE = "AI review failed. Try resubmitting.";
++
+     private final TaskReviewRepository taskReviewRepository;
+     private final TaskRepository taskRepository;
+     private final UserAccountRepository userAccountRepository;
+@@ -76,14 +87,73 @@ public class ReviewPipelineService {
+     private void executePipeline(Long reviewId) {
+         TaskReview tr = taskReviewRepository.findByIdWithTask(reviewId)
+             .orElseThrow(() -> new IllegalStateException("TaskReview not found: " + reviewId));
+-        String diff = gitHubClient.getPrDiff(
+-            tr.getGithubRepoOwner(),
+-            tr.getGithubRepoName(),
+-            tr.getGithubPrNumber()
+-        );
++        String diff;
++        try {
++            diff = gitHubClient.getPrDiff(
++                tr.getGithubRepoOwner(),
++                tr.getGithubRepoName(),
++                tr.getGithubPrNumber()
++            );
++        } catch (RestClientResponseException e) {
++            int code = e.getStatusCode().value();
++            if (code == 404) {
++                reviewPersistenceService.markPipelineError(reviewId, MSG_GITHUB_404);
++                return;
++            }
++            if (code == 403) {
++                reviewPersistenceService.markPipelineError(reviewId, MSG_GITHUB_403);
++                return;
++            }
++            if (code == 429) {
++                reviewPersistenceService.markPipelineError(reviewId, MSG_GITHUB_429);
++                return;
++            }
++            throw e;
++        }
+         String taskDescription = tr.getTask().getTaskDescription() != null
+             ? tr.getTask().getTaskDescription() : "";
+-        ReviewFeedback feedback = llmReviewService.review(taskDescription, diff);
++        ReviewFeedback feedback;
++        try {
++            feedback = llmReviewService.review(taskDescription, diff);
++        } catch (Exception e) {
++            if (isLlmTimeout(e)) {
++                reviewPersistenceService.markPipelineError(reviewId, MSG_LLM_TIMEOUT);
++                return;
++            }
++            if (isLlmParseFailure(e)) {
++                reviewPersistenceService.markPipelineError(reviewId, MSG_LLM_PARSE);
++                return;
++            }
++            throw e;
++        }
+         reviewPersistenceService.saveLlmSuccess(reviewId, feedback);
+     }
++
++    private static boolean isLlmTimeout(Throwable e) {
++        for (Throwable t = e; t != null; t = t.getCause()) {
++            if (t instanceof SocketTimeoutException || t instanceof TimeoutException) {
++                return true;
++            }
++        }
++        if (e instanceof ResourceAccessException rae) {
++            String m = rae.getMessage();
++            return m != null && m.toLowerCase().contains("timed out");
++        }
++        return false;
++    }
++
++    private static boolean isLlmParseFailure(Throwable e) {
++        for (Throwable t = e; t != null; t = t.getCause()) {
++            if (t instanceof JsonProcessingException) {
++                return true;
++            }
++            if (t instanceof IllegalStateException ise) {
++                String m = ise.getMessage();
++                if (m != null && m.contains("could not be parsed")) {
++                    return true;
++                }
++            }
++        }
++        return false;
++    }
+ }
+diff --git a/src/main/java/com/examinai/review/ReviewSubmissionController.java b/src/main/java/com/examinai/review/ReviewSubmissionController.java
+index 67bbb93..d531f28 100644
+--- a/src/main/java/com/examinai/review/ReviewSubmissionController.java
++++ b/src/main/java/com/examinai/review/ReviewSubmissionController.java
+@@ -33,6 +33,7 @@ public class ReviewSubmissionController {
+                          Authentication auth) {
+         if (bindingResult.hasErrors()) {
+             model.addAttribute("task", taskService.findForInternTaskDetail(auth.getName(), taskId));
++            model.addAttribute("submissionHistory", taskService.findSubmissionHistoryForInternTask(auth.getName(), taskId));
+             return "intern/task-detail";
+         }
+         Long reviewId = reviewPipelineService.submitPendingReview(
+diff --git a/src/main/java/com/examinai/review/TaskReviewRepository.java b/src/main/java/com/examinai/review/TaskReviewRepository.java
+index 7b5ec42..1809d7e 100644
+--- a/src/main/java/com/examinai/review/TaskReviewRepository.java
++++ b/src/main/java/com/examinai/review/TaskReviewRepository.java
+@@ -42,7 +42,10 @@ public interface TaskReviewRepository extends JpaRepository<TaskReview, Long> {
+         JOIN FETCH tr.task t
+         LEFT JOIN FETCH t.course
+         JOIN FETCH tr.intern
++        LEFT JOIN FETCH tr.issues
+         WHERE tr.id = :id
+         """)
+     Optional<TaskReview> findByIdForInternStatusPage(@Param("id") Long id);
++
++    List<TaskReview> findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(Long taskId, Long internId);
+ }
+diff --git a/src/main/java/com/examinai/task/InternTaskController.java b/src/main/java/com/examinai/task/InternTaskController.java
+index e62342c..ccec970 100644
+--- a/src/main/java/com/examinai/task/InternTaskController.java
++++ b/src/main/java/com/examinai/task/InternTaskController.java
+@@ -26,6 +26,7 @@ public class InternTaskController {
+     public String taskDetail(@PathVariable Long taskId, Model model, Authentication auth) {
+         model.addAttribute("task", taskService.findForInternTaskDetail(auth.getName(), taskId));
+         model.addAttribute("submission", new ReviewSubmissionDto());
++        model.addAttribute("submissionHistory", taskService.findSubmissionHistoryForInternTask(auth.getName(), taskId));
+         return "intern/task-detail";
+     }
+ 
+diff --git a/src/main/java/com/examinai/task/TaskService.java b/src/main/java/com/examinai/task/TaskService.java
+index b5846a7..ca61d9f 100644
+--- a/src/main/java/com/examinai/task/TaskService.java
++++ b/src/main/java/com/examinai/task/TaskService.java
+@@ -113,6 +113,19 @@ public class TaskService {
+             .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+     }
+ 
++    /**
++     * All submission attempts for this intern on the task, newest first (for history list / attempt numbering).
++     */
++    @Transactional(readOnly = true)
++    @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
++    public List<TaskReview> findSubmissionHistoryForInternTask(String username, Long taskId) {
++        UserAccount intern = userAccountRepository.findByUsername(username)
++            .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
++        taskRepository.findByIdWithCourseAndMentor(taskId)
++            .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
++        return taskReviewRepository.findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(taskId, intern.getId());
++    }
++
+     @Transactional(readOnly = true)
+     @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
+     public List<TaskWithReview> findForInternByUsername(String username) {
+diff --git a/src/main/resources/application.yml b/src/main/resources/application.yml
+index f7ccf10..0da45a1 100644
+--- a/src/main/resources/application.yml
++++ b/src/main/resources/application.yml
+@@ -26,6 +26,7 @@ spring:
+             enable: true
+   ai:
+     ollama:
++      # NFR13: Ollama chat HTTP read timeout is capped at 120s in com.examinai.config.AIConfig (no separate starter property).
+       base-url: ${OLLAMA_BASE_URL:http://ollama:11434}
+ 
+ github:
+diff --git a/src/main/resources/templates/fragments/intern-status-card.html b/src/main/resources/templates/fragments/intern-status-card.html
+index ef2d316..370a382 100644
+--- a/src/main/resources/templates/fragments/intern-status-card.html
++++ b/src/main/resources/templates/fragments/intern-status-card.html
+@@ -1,19 +1,65 @@
+ <!DOCTYPE html>
+ <html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+ <body>
+-<div th:fragment="internStatusCard(review)" class="card border-light shadow-sm mb-3"
+-     th:attr="data-review-id=${review.id},data-initial-status=${review.status.name()}">
+-    <div class="card-body">
+-        <h4 class="h5 card-title">Review status</h4>
++<div th:fragment="internStatusCard(review, submission)"
++     class="card shadow-sm mb-3"
++     th:classappend="${review.status.name() == 'APPROVED'} ? ' border border-success border-2' : (${review.status.name() == 'REJECTED' or review.status.name() == 'ERROR'} ? ' border border-danger border-2' : ' border border-light')">
++    <div class="card-body py-3">
++        <h4 class="h6 card-title mb-2">Review status</h4>
+         <p class="text-muted small mb-1" th:text="${review.task.taskName}">Task name</p>
+         <p class="text-muted small mb-2" th:text="${review.task.course.courseName}">Course</p>
+         <div th:replace="~{fragments/review-status-badge :: statusBadge(${review.status})}"></div>
+-        <p class="text-muted small mt-3 mb-0"
++
++        <div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert"
++             th:if="${review.status.name() == 'ERROR' and review.errorMessage != null and !review.errorMessage.isBlank()}"
++             th:text="${review.errorMessage}">Error</div>
++
++        <div class="mt-2" th:if="${review.status.name() == 'REJECTED' and review.mentorRemarks != null and !review.mentorRemarks.isBlank()}">
++            <h6 class="text-muted text-uppercase small mb-1">Mentor remarks</h6>
++            <p class="mb-0 small" th:text="${review.mentorRemarks}">Remarks</p>
++        </div>
++        <div class="mt-2" th:if="${review.status.name() == 'APPROVED' and review.mentorRemarks != null and !review.mentorRemarks.isBlank()}">
++            <h6 class="text-muted text-uppercase small mb-1">Mentor remarks</h6>
++            <p class="mb-0 small" th:text="${review.mentorRemarks}">Remarks</p>
++        </div>
++
++        <div th:if="${review.status.name() == 'REJECTED' and review.issues != null and !review.issues.isEmpty()}" class="mt-2">
++            <h6 class="text-muted text-uppercase small mb-1">AI issues</h6>
++            <ul class="list-unstyled small mb-0">
++                <li th:each="issue : ${review.issues}" th:text="${issue.issue}">Issue</li>
++            </ul>
++        </div>
++
++        <p class="text-muted small mt-2 mb-0"
+            th:if="${review.status.name() == 'PENDING' or review.status.name() == 'LLM_EVALUATED'}">
+             Checking statusΓÇª
+         </p>
++
++        <th:block th:if="${review.status.name() == 'ERROR' or review.status.name() == 'REJECTED'}">
++            <hr class="my-2"/>
++            <h6 class="text-muted text-uppercase small mb-2">Resubmit</h6>
++            <form th:action="@{/intern/tasks/{id}/submit(id=${review.task.id})}"
++                  th:object="${submission}" method="post" class="row g-2" novalidate>
++                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
++                <div class="col-md-4 col-12">
++                    <label class="form-label small mb-0" for="resubmit-repo-owner">Repository Owner</label>
++                    <input id="resubmit-repo-owner" class="form-control form-control-sm" type="text" th:field="*{repoOwner}" required autocomplete="off"/>
++                </div>
++                <div class="col-md-4 col-12">
++                    <label class="form-label small mb-0" for="resubmit-repo-name">Repository Name</label>
++                    <input id="resubmit-repo-name" class="form-control form-control-sm" type="text" th:field="*{repoName}" required autocomplete="off"/>
++                </div>
++                <div class="col-md-4 col-12">
++                    <label class="form-label small mb-0" for="resubmit-pr">Pull Request Number</label>
++                    <input id="resubmit-pr" class="form-control form-control-sm" type="number" min="1" th:field="*{prNumber}" required/>
++                </div>
++                <div class="col-12 mt-1">
++                    <button type="submit" class="btn btn-primary btn-sm">Submit for AI review</button>
++                </div>
++            </form>
++        </th:block>
+     </div>
+-    <div class="card-footer bg-body-tertiary text-muted small">
++    <div class="card-footer bg-body-tertiary text-muted small py-2">
+         Reference: <span th:text="${review.id}">0</span>
+     </div>
+ </div>
+diff --git a/src/main/resources/templates/intern/review-status.html b/src/main/resources/templates/intern/review-status.html
+index d46a800..ee54b74 100644
+--- a/src/main/resources/templates/intern/review-status.html
++++ b/src/main/resources/templates/intern/review-status.html
+@@ -6,7 +6,7 @@
+ <body>
+ <main id="main-content" layout:fragment="content">
+     <h1 class="h4 mb-3">Review status</h1>
+-    <div th:replace="~{fragments/intern-status-card :: internStatusCard(${review})}"></div>
++    <div th:replace="~{fragments/intern-status-card :: internStatusCard(${review}, ${submission})}"></div>
+     <p class="mb-0">
+         <a th:href="@{/intern/tasks}">Back to my tasks</a>
+     </p>
+diff --git a/src/main/resources/templates/intern/task-detail.html b/src/main/resources/templates/intern/task-detail.html
+index 45458a5..44f6910 100644
+--- a/src/main/resources/templates/intern/task-detail.html
++++ b/src/main/resources/templates/intern/task-detail.html
+@@ -55,6 +55,27 @@
+             <a class="btn btn-outline-secondary ms-2" th:href="@{/intern/tasks}">Cancel</a>
+         </div>
+     </form>
++
++    <h5 class="mt-5 mb-3">Submission history</h5>
++    <p class="text-muted small mb-2" th:if="${submissionHistory == null or submissionHistory.isEmpty()}">No submissions yet.</p>
++    <div class="list-group" th:if="${submissionHistory != null and !submissionHistory.isEmpty()}">
++        <div class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2"
++             th:each="entry, iterStat : ${submissionHistory}"
++             th:with="attemptNum=${#lists.size(submissionHistory) - iterStat.index}">
++            <div class="flex-grow-1">
++                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
++                    <span class="fw-semibold" th:text="'Attempt ' + ${attemptNum}">Attempt 1</span>
++                    <div th:replace="~{fragments/review-status-badge :: statusBadge(${entry.status})}"></div>
++                </div>
++                <div class="small text-muted"
++                     th:text="${#temporals.format(entry.dateCreated, 'dd MMM yyyy HH:mm', T(java.util.Locale).ENGLISH)}">1 Jan 2026 12:00</div>
++                <div class="small mt-1" th:if="${entry.mentorRemarks != null and !entry.mentorRemarks.isBlank()}">
++                    <span class="text-muted">Mentor remarks:</span>
++                    <span th:text="${entry.mentorRemarks}">ΓÇö</span>
++                </div>
++            </div>
++        </div>
++    </div>
+ </main>
+ </body>
+ </html>
+diff --git a/src/test/java/com/examinai/review/ReviewPipelineServiceTest.java b/src/test/java/com/examinai/review/ReviewPipelineServiceTest.java
+index 1deab0d..422738e 100644
+--- a/src/test/java/com/examinai/review/ReviewPipelineServiceTest.java
++++ b/src/test/java/com/examinai/review/ReviewPipelineServiceTest.java
+@@ -10,12 +10,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
+ import org.mockito.InjectMocks;
+ import org.mockito.Mock;
+ import org.mockito.junit.jupiter.MockitoExtension;
++import com.fasterxml.jackson.core.JsonParseException;
+ import org.springframework.context.ApplicationEventPublisher;
++import org.springframework.http.HttpStatus;
++import org.springframework.web.client.HttpClientErrorException;
++import org.springframework.web.client.ResourceAccessException;
++import java.net.SocketTimeoutException;
++import java.nio.charset.StandardCharsets;
+ import java.util.Optional;
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.anyString;
+ import static org.mockito.ArgumentMatchers.eq;
++import static org.mockito.Mockito.doAnswer;
+ import static org.mockito.Mockito.inOrder;
++import static org.mockito.Mockito.never;
+ import static org.mockito.Mockito.verify;
+ import static org.mockito.Mockito.when;
+ 
+@@ -95,4 +104,107 @@ class ReviewPipelineServiceTest {
+ 
+         verify(reviewPersistenceService).markPipelineError(eq(1L), org.mockito.ArgumentMatchers.contains("boom"));
+     }
++
++    @Test
++    void runPipeline_github404_setsExactUserMessage() {
++        TaskReview tr = reviewStub();
++        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
++        when(gitHubClient.getPrDiff("a", "b", 9)).thenThrow(
++            HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found",
++                null, null, StandardCharsets.UTF_8));
++
++        reviewPipelineService.runPipeline(8L);
++
++        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_GITHUB_404);
++        verify(reviewPersistenceService, never()).saveLlmSuccess(any(), any());
++    }
++
++    @Test
++    void runPipeline_github403_setsExactUserMessage() {
++        TaskReview tr = reviewStub();
++        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
++        when(gitHubClient.getPrDiff("a", "b", 9)).thenThrow(
++            HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden",
++                null, null, StandardCharsets.UTF_8));
++
++        reviewPipelineService.runPipeline(8L);
++
++        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_GITHUB_403);
++    }
++
++    @Test
++    void runPipeline_github429_setsExactUserMessage() {
++        TaskReview tr = reviewStub();
++        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
++        when(gitHubClient.getPrDiff("a", "b", 9)).thenThrow(
++            HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "Too Many",
++                null, null, StandardCharsets.UTF_8));
++
++        reviewPipelineService.runPipeline(8L);
++
++        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_GITHUB_429);
++    }
++
++    @Test
++    void runPipeline_llmReadTimeout_setsExactUserMessage() {
++        TaskReview tr = reviewStub();
++        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
++        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
++        when(llmReviewService.review("desc", "diff")).thenThrow(new ResourceAccessException("Read timed out"));
++
++        reviewPipelineService.runPipeline(8L);
++
++        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_TIMEOUT);
++    }
++
++    @Test
++    void runPipeline_llmSocketTimeout_setsExactUserMessage() {
++        TaskReview tr = reviewStub();
++        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
++        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
++        doAnswer(inv -> {
++            throw new RuntimeException(new SocketTimeoutException("timeout"));
++        }).when(llmReviewService).review(anyString(), anyString());
++
++        reviewPipelineService.runPipeline(8L);
++
++        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_TIMEOUT);
++    }
++
++    @Test
++    void runPipeline_llmParseFailure_setsExactUserMessage() {
++        TaskReview tr = reviewStub();
++        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
++        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
++        when(llmReviewService.review("desc", "diff"))
++            .thenThrow(new RuntimeException(new JsonParseException(null, "bad json")));
++
++        reviewPipelineService.runPipeline(8L);
++
++        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_PARSE);
++    }
++
++    @Test
++    void runPipeline_llmNullFeedbackIllegalState_setsExactUserMessage() {
++        TaskReview tr = reviewStub();
++        when(taskReviewRepository.findByIdWithTask(8L)).thenReturn(Optional.of(tr));
++        when(gitHubClient.getPrDiff("a", "b", 9)).thenReturn("diff");
++        when(llmReviewService.review("desc", "diff"))
++            .thenThrow(new IllegalStateException("LLM output could not be parsed into ReviewFeedback: {}"));
++
++        reviewPipelineService.runPipeline(8L);
++
++        verify(reviewPersistenceService).markPipelineError(8L, ReviewPipelineService.MSG_LLM_PARSE);
++    }
++
++    private static TaskReview reviewStub() {
++        Task task = new Task();
++        task.setTaskDescription("desc");
++        TaskReview tr = new TaskReview();
++        tr.setTask(task);
++        tr.setGithubRepoOwner("a");
++        tr.setGithubRepoName("b");
++        tr.setGithubPrNumber(9);
++        return tr;
++    }
+ }
+diff --git a/src/test/java/com/examinai/review/ReviewSubmissionControllerTest.java b/src/test/java/com/examinai/review/ReviewSubmissionControllerTest.java
+index c226223..d40a5b1 100644
+--- a/src/test/java/com/examinai/review/ReviewSubmissionControllerTest.java
++++ b/src/test/java/com/examinai/review/ReviewSubmissionControllerTest.java
+@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
+ import org.springframework.security.test.context.support.WithMockUser;
+ import org.springframework.test.web.servlet.MockMvc;
+ import static org.mockito.ArgumentMatchers.eq;
++import java.util.List;
+ import static org.mockito.Mockito.verify;
+ import static org.mockito.Mockito.when;
+ import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+@@ -58,6 +59,7 @@ class ReviewSubmissionControllerTest {
+         course.setCourseName("C");
+         task.setCourse(course);
+         when(taskService.findForInternTaskDetail("user", 1L)).thenReturn(task);
++        when(taskService.findSubmissionHistoryForInternTask("user", 1L)).thenReturn(List.of());
+ 
+         mockMvc.perform(post("/intern/tasks/1/submit")
+                 .with(csrf())
+@@ -66,5 +68,7 @@ class ReviewSubmissionControllerTest {
+                 .param("prNumber", "42"))
+             .andExpect(status().isOk())
+             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("intern/task-detail"));
++
++        verify(taskService).findSubmissionHistoryForInternTask("user", 1L);
+     }
+ }
+diff --git a/src/test/java/com/examinai/task/TaskServiceTest.java b/src/test/java/com/examinai/task/TaskServiceTest.java
+index 1b80581..6622bb1 100644
+--- a/src/test/java/com/examinai/task/TaskServiceTest.java
++++ b/src/test/java/com/examinai/task/TaskServiceTest.java
+@@ -17,6 +17,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
+ import org.springframework.security.core.authority.SimpleGrantedAuthority;
+ import org.springframework.security.core.context.SecurityContextHolder;
+ import org.springframework.security.core.context.SecurityContextImpl;
++import com.examinai.review.ReviewStatus;
++import com.examinai.review.TaskReview;
++import java.time.LocalDateTime;
+ import java.util.Collections;
+ import java.util.List;
+ import java.util.Optional;
+@@ -44,6 +47,12 @@ class TaskServiceTest {
+                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))));
+     }
+ 
++    private void setInternContext() {
++        SecurityContextHolder.setContext(new SecurityContextImpl(
++            new UsernamePasswordAuthenticationToken("intern", "password",
++                List.of(new SimpleGrantedAuthority("ROLE_INTERN")))));
++    }
++
+     @Test
+     void create_savesTaskWithCorrectFields() {
+         Course course = new Course();
+@@ -135,6 +144,30 @@ class TaskServiceTest {
+         assertThat(result).isSameAs(task);
+     }
+ 
++    @Test
++    void findSubmissionHistoryForInternTask_newestFirst() {
++        setInternContext();
++        UserAccount intern = new UserAccount();
++        intern.setUsername("intern");
++        Task task = new Task();
++        task.setTaskName("T");
++        TaskReview older = new TaskReview();
++        older.setStatus(ReviewStatus.ERROR);
++        older.setDateCreated(LocalDateTime.of(2026, 1, 1, 10, 0));
++        TaskReview newer = new TaskReview();
++        newer.setStatus(ReviewStatus.PENDING);
++        newer.setDateCreated(LocalDateTime.of(2026, 2, 1, 10, 0));
++
++        when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
++        when(taskRepository.findByIdWithCourseAndMentor(3L)).thenReturn(Optional.of(task));
++        when(taskReviewRepository.findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(eq(3L), isNull()))
++            .thenReturn(List.of(newer, older));
++
++        List<TaskReview> history = taskService.findSubmissionHistoryForInternTask("intern", 3L);
++
++        assertThat(history).containsExactly(newer, older);
++    }
++
+     @Test
+     void findForInternByUsername_withNoReviews_returnsTasksWithNullReview() {
+         UserAccount intern = new UserAccount();

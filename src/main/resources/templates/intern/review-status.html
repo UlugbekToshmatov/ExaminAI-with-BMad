@@ -6,7 +6,7 @@
 <body>
 <main id="main-content" layout:fragment="content">
     <h1 class="h4 mb-3">Review status</h1>
-    <div th:replace="~{fragments/intern-status-card :: internStatusCard(${review})}"></div>
+    <div th:replace="~{fragments/intern-status-card :: internStatusCard(${review}, ${submission})}"></div>
     <p class="mb-0">
         <a th:href="@{/intern/tasks}">Back to my tasks</a>
     </p>

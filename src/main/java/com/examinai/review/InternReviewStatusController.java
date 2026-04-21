@@ -31,6 +31,7 @@ public class InternReviewStatusController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         model.addAttribute("review", tr);
+        model.addAttribute("submission", new ReviewSubmissionDto());
         return "intern/review-status";
     }
 }
