@@ -29,3 +29,14 @@
 - Seed data uses `now()` for all timestamps — non-deterministic values across environments; use a fixed literal (e.g., `'2026-01-01 00:00:00'`) for deterministic seed data
 - Absolute `href` paths in admin templates break under non-root context path deployment; replace with `th:href="@{...}"` (user-list.html:10, user-form.html:37)
 - No password complexity enforcement — single-character passwords are accepted by the service; add minimum length/complexity validation in a future story
+
+## Deferred from: code review of 2-1-course-management (2026-04-21)
+
+- Spring AOP self-invocation: `@PreAuthorize` on `findById()` skipped when called from `update()`/`delete()` — no current security gap (same expression on all methods), but annotation is misleading for in-process callers (CourseService.java:22)
+- JavaScript `confirm()` is the only delete guard — no server-side second-factor confirmation; standard pattern but easily bypassed (course-list.html:38)
+- `LocalDateTime.now()` for `dateCreated` — JVM local time, not UTC; timestamps inconsistent in multi-timezone/containerized deployments (Course.java:25)
+- Redundant `courseRepository.save()` in `@Transactional update()` — JPA dirty checking auto-flushes changes on commit; explicit save harmless but unnecessary (CourseService.java:43)
+- `findAllByOrderByCourseNameAsc()` returns unbounded `List` — no pagination; potential heap pressure at scale (CourseRepository.java:7)
+- `Course` entity has no `equals`/`hashCode` override — identity-based comparison; subtle bugs possible in set/cache operations (Course.java)
+- `create_savesCourseWithCorrectFields` test does not assert `dateCreated` — `@PrePersist` not invoked in Mockito context; lifecycle behavior untested (CourseServiceTest.java:27)
+- No `CourseControllerTest` — form binding, redirect, and validation re-render untested at controller level
