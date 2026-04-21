@@ -5,14 +5,13 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.31.xsd">
 
-    <!--
-        Changelogs are added by subsequent stories in strict order:
-        001-init-schema.sql     (Story 1.2) — user_account, course, task, task_review, task_review_issue
-        002-spring-session.sql  (Story 1.2) — spring_session tables
-        003-indexes.sql         (Story 1.3) — performance indexes
-        004-seed-data.sql       (Story 1.3) — admin/mentor/intern seed accounts + sample course/tasks
+    <include file="changelogs/001-init-schema.sql" relativeToChangelogFile="true"/>
+    <include file="changelogs/002-spring-session.sql" relativeToChangelogFile="true"/>
 
-        DO NOT change include order — Liquibase runs these as an ordered migration chain.
+    <!--
+        003-indexes.sql     (Story 1.3) — performance indexes
+        004-seed-data.sql   (Story 1.3) — admin/mentor/intern seed accounts + sample course/tasks
+        DO NOT add those includes here — they belong in Story 1.3
     -->
 
 </databaseChangeLog>
