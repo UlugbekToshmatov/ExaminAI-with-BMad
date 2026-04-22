@@ -84,3 +84,7 @@
 ## Deferred from: code review of 4-2-mentor-review-detail-ai-feedback-decision.md (2026-04-22)
 
 - Thymeleaf `#strings.toUpperCase` on `llmResult` uses the default locale — rare locales could mis-map verdict strings for the APPROVE/REJECT badges (`review-detail.html`, `mentor-action-panel.html`)
+
+## Deferred from: code review of 5-1-email-notifications.md (2026-04-22)
+
+- `application.yml` mail block (AC6) was not part of the reviewable unified diff; file already uses `MAIL_HOST`, `MAIL_PORT:587`, `MAIL_USERNAME`, `MAIL_PASSWORD` with no hard-coded secrets. Verification noted as out-of-band for this review pass.
