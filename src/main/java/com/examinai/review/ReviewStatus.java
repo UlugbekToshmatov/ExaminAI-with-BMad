@@ -7,6 +7,16 @@ public enum ReviewStatus {
     REJECTED,
     ERROR;
 
+    /**
+     * Submissions the mentor (or admin) may still resolve when AI output is missing or failed.
+     */
+    public boolean allowsMentorDecision() {
+        return switch (this) {
+            case PENDING, LLM_EVALUATED, ERROR -> true;
+            case APPROVED, REJECTED -> false;
+        };
+    }
+
     public String getDisplayLabel() {
         return switch (this) {
             case PENDING -> "Submitted";

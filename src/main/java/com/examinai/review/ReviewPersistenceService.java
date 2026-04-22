@@ -69,8 +69,9 @@ public class ReviewPersistenceService {
     }
 
     /**
-     * Applies the mentor (or admin) final decision. Only the transition
-     * {@code LLM_EVALUATED → APPROVED/REJECTED} is allowed here; controllers must not set status.
+     * Applies the mentor (or admin) final decision from {@link ReviewStatus#PENDING},
+     * {@link ReviewStatus#LLM_EVALUATED}, or {@link ReviewStatus#ERROR} to
+     * {@code APPROVED}/{@code REJECTED}. Controllers must not set status directly.
      * <p>
      * Stale or duplicate submit after a decision: HTTP 409 Conflict
      * with no state change. Unknown review id: 404.
@@ -84,7 +85,7 @@ public class ReviewPersistenceService {
     public void saveMentorDecision(Long reviewId, boolean approve, String mentorRemarks) {
         TaskReview tr = taskReviewRepository.findByIdForMentorDetail(reviewId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (tr.getStatus() != ReviewStatus.LLM_EVALUATED) {
+        if (!tr.getStatus().allowsMentorDecision()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Review is not awaiting a mentor decision");
         }
         ReviewStatus terminal = approve ? ReviewStatus.APPROVED : ReviewStatus.REJECTED;

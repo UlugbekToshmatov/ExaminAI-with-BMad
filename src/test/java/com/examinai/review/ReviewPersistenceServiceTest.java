@@ -71,7 +71,7 @@ class ReviewPersistenceServiceTest {
     }
 
     @Test
-    void saveMentorDecision_notLlmEvaluated_throws409() {
+    void saveMentorDecision_terminalStatus_throws409() {
         TaskReview tr = buildReview(ReviewStatus.APPROVED, "APPROVE");
         when(taskReviewRepository.findByIdForMentorDetail(3L)).thenReturn(Optional.of(tr));
 
@@ -80,6 +80,30 @@ class ReviewPersistenceServiceTest {
             .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void saveMentorDecision_fromPending_persistsAndPublishes() {
+        TaskReview tr = buildReview(ReviewStatus.PENDING, null);
+        when(taskReviewRepository.findByIdForMentorDetail(30L)).thenReturn(Optional.of(tr));
+        when(taskReviewRepository.save(any(TaskReview.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewPersistenceService.saveMentorDecision(30L, true, "manual ok");
+
+        assertThat(tr.getStatus()).isEqualTo(ReviewStatus.APPROVED);
+        verify(eventPublisher).publishEvent(any(MentorDecisionEvent.class));
+    }
+
+    @Test
+    void saveMentorDecision_fromError_persistsAndPublishes() {
+        TaskReview tr = buildReview(ReviewStatus.ERROR, null);
+        when(taskReviewRepository.findByIdForMentorDetail(31L)).thenReturn(Optional.of(tr));
+        when(taskReviewRepository.save(any(TaskReview.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewPersistenceService.saveMentorDecision(31L, false, "LLM failed — see email");
+
+        assertThat(tr.getStatus()).isEqualTo(ReviewStatus.REJECTED);
+        verify(eventPublisher).publishEvent(any(MentorDecisionEvent.class));
     }
 
     @Test

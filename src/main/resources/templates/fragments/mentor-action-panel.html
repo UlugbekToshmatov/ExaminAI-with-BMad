@@ -2,20 +2,30 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="mentorActionPanel(review)">
-    <th:block th:if="${review.status == T(com.examinai.review.ReviewStatus).LLM_EVALUATED}">
+    <th:block th:if="${review.status.allowsMentorDecision()}">
         <div class="mentor-content mentor-action-panel">
             <p class="mentor-content-label mb-2">Mentor decision</p>
-            <div class="mb-3" th:with="upper=${review.llmResult != null} ? ${#strings.toUpperCase(review.llmResult)} : ''">
-                <th:block th:if="${review.llmResult == null or review.llmResult.isBlank()}">
-                    <span class="badge text-bg-secondary">AI Suggestion: —</span>
-                </th:block>
-                <th:block th:if="${review.llmResult != null and !review.llmResult.isBlank()}">
-                    <span th:if="${upper == 'APPROVE'}" class="badge text-bg-success">AI Suggestion: APPROVE</span>
-                    <span th:if="${upper == 'REJECT'}" class="badge text-bg-danger">AI Suggestion: REJECT</span>
-                    <span th:if="${upper != 'APPROVE' and upper != 'REJECT'}" class="badge text-bg-secondary"
-                          th:text="${'AI Suggestion: ' + #strings.abbreviate(upper, 20)}">AI Suggestion</span>
-                </th:block>
-            </div>
+
+            <th:block th:if="${review.status == T(com.examinai.review.ReviewStatus).LLM_EVALUATED}">
+                <div class="mb-3" th:with="upper=${review.llmResult != null} ? ${#strings.toUpperCase(review.llmResult)} : ''">
+                    <th:block th:if="${review.llmResult == null or review.llmResult.isBlank()}">
+                        <span class="badge text-bg-secondary">AI Suggestion: —</span>
+                    </th:block>
+                    <th:block th:if="${review.llmResult != null and !review.llmResult.isBlank()}">
+                        <span th:if="${upper == 'APPROVE'}" class="badge text-bg-success">AI Suggestion: APPROVE</span>
+                        <span th:if="${upper == 'REJECT'}" class="badge text-bg-danger">AI Suggestion: REJECT</span>
+                        <span th:if="${upper != 'APPROVE' and upper != 'REJECT'}" class="badge text-bg-secondary"
+                              th:text="${'AI Suggestion: ' + #strings.abbreviate(upper, 20)}">AI Suggestion</span>
+                    </th:block>
+                </div>
+            </th:block>
+            <th:block th:if="${review.status != T(com.examinai.review.ReviewStatus).LLM_EVALUATED}">
+                <p class="text-muted small mb-3">
+                    AI feedback is not available for this submission (still processing, or the automated review failed).
+                    You can still approve or reject and add remarks for the intern.
+                </p>
+            </th:block>
+
             <p class="text-muted small mb-3">Your decision is final.</p>
 
             <form th:action="@{/mentor/reviews/{id}/approve(id=${review.id})}" method="post" class="mb-2">
@@ -39,7 +49,7 @@
             <a th:href="@{/mentor/reviews}" class="text-muted small d-inline-block w-100 text-center">← Back to Queue</a>
         </div>
     </th:block>
-    <th:block th:if="${review.status != T(com.examinai.review.ReviewStatus).LLM_EVALUATED}">
+    <th:block th:if="${not review.status.allowsMentorDecision()}">
         <div class="mentor-content">
             <p class="text-muted small mb-0">This review is not awaiting a decision.</p>
             <a th:href="@{/mentor/reviews}" class="text-muted small d-inline-block mt-2">← Back to Queue</a>

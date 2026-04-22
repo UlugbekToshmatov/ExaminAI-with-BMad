@@ -1,5 +1,6 @@
 package com.examinai.course;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -19,32 +20,36 @@ public class CourseController {
 
     @GetMapping({"/mentor/courses", "/admin/courses"})
     @PreAuthorize("hasRole('MENTOR') or hasRole('ADMIN')")
-    public String list(Model model) {
+    public String list(Model model, HttpServletRequest request) {
         model.addAttribute("courses", courseService.findAll());
+        model.addAttribute("baseCourseUrl", baseCourseUrl(request));
         return "admin/course-list";
     }
 
     @GetMapping({"/mentor/courses/new", "/admin/courses/new"})
     @PreAuthorize("hasRole('MENTOR') or hasRole('ADMIN')")
-    public String newForm(Model model) {
+    public String newForm(Model model, HttpServletRequest request) {
         model.addAttribute("courseDto", new CourseCreateDto());
+        model.addAttribute("baseCourseUrl", baseCourseUrl(request));
         return "admin/course-form";
     }
 
     @PostMapping({"/mentor/courses", "/admin/courses"})
     @PreAuthorize("hasRole('MENTOR') or hasRole('ADMIN')")
     public String create(@Valid @ModelAttribute("courseDto") CourseCreateDto dto,
-                         BindingResult bindingResult) {
+                         BindingResult bindingResult, Model model, HttpServletRequest request) {
         if (bindingResult.hasErrors()) {
+            model.addAttribute("baseCourseUrl", baseCourseUrl(request));
             return "admin/course-form";
         }
         courseService.create(dto);
-        return "redirect:/mentor/courses";
+        return "redirect:" + baseCourseUrl(request);
     }
 
     @GetMapping({"/mentor/courses/{id}/edit", "/admin/courses/{id}/edit"})
     @PreAuthorize("hasRole('MENTOR') or hasRole('ADMIN')")
-    public String editForm(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+    public String editForm(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes,
+                           HttpServletRequest request) {
         try {
             Course course = courseService.findById(id);
             CourseCreateDto dto = new CourseCreateDto();
@@ -52,10 +57,11 @@ public class CourseController {
             dto.setTechnology(course.getTechnology());
             model.addAttribute("courseDto", dto);
             model.addAttribute("courseId", id);
+            model.addAttribute("baseCourseUrl", baseCourseUrl(request));
             return "admin/course-form";
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
-            return "redirect:/mentor/courses";
+            return "redirect:" + baseCourseUrl(request);
         }
     }
 
@@ -65,28 +71,34 @@ public class CourseController {
                          @Valid @ModelAttribute("courseDto") CourseCreateDto dto,
                          BindingResult bindingResult,
                          Model model,
-                         RedirectAttributes redirectAttributes) {
+                         RedirectAttributes redirectAttributes,
+                         HttpServletRequest request) {
         if (bindingResult.hasErrors()) {
             model.addAttribute("courseId", id);
+            model.addAttribute("baseCourseUrl", baseCourseUrl(request));
             return "admin/course-form";
         }
         try {
             courseService.update(id, dto);
-            return "redirect:/mentor/courses";
+            return "redirect:" + baseCourseUrl(request);
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
-            return "redirect:/mentor/courses";
+            return "redirect:" + baseCourseUrl(request);
         }
     }
 
     @PostMapping({"/mentor/courses/{id}/delete", "/admin/courses/{id}/delete"})
     @PreAuthorize("hasRole('MENTOR') or hasRole('ADMIN')")
-    public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes, HttpServletRequest request) {
         try {
             courseService.delete(id);
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
-        return "redirect:/mentor/courses";
+        return "redirect:" + baseCourseUrl(request);
+    }
+
+    private String baseCourseUrl(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/admin") ? "/admin/courses" : "/mentor/courses";
     }
 }
