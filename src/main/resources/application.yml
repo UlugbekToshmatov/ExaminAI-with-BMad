@@ -28,6 +28,11 @@ spring:
     ollama:
       # NFR13: Ollama chat HTTP read timeout is capped at 120s in com.examinai.config.AIConfig (no separate starter property).
       base-url: ${OLLAMA_BASE_URL:http://ollama:11434}
+      chat:
+        options:
+          model: deepseek-r1:8b
+      init:
+        pull-model-strategy: never
 
 github:
   token: ${GITHUB_TOKEN:}
