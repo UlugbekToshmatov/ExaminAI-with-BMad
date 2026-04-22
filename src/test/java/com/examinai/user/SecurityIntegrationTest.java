@@ -4,6 +4,9 @@ import com.examinai.admin.AdminController;
 import com.examinai.config.SecurityConfig;
 import com.examinai.review.InternReviewStatusController;
 import com.examinai.review.MentorReviewController;
+import com.examinai.review.MentorReviewQueueView;
+import com.examinai.review.MentorReviewService;
+import com.examinai.review.ReviewStatus;
 import com.examinai.review.ReviewSubmissionController;
 import com.examinai.review.ReviewPipelineService;
 import com.examinai.review.TaskReview;
@@ -19,6 +22,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import java.util.List;
 import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -54,6 +58,9 @@ class SecurityIntegrationTest {
     @MockBean
     TaskReviewRepository taskReviewRepository;
 
+    @MockBean
+    MentorReviewService mentorReviewService;
+
     @BeforeEach
     void setUp() {
         when(taskService.findForInternByUsername(any())).thenReturn(java.util.Collections.emptyList());
@@ -70,6 +77,9 @@ class SecurityIntegrationTest {
         tr.setIntern(intern);
         tr.setTask(stubTask);
         when(taskReviewRepository.findByIdForInternStatusPage(eq(1L))).thenReturn(Optional.of(tr));
+        when(mentorReviewService.loadQueue(any(), any(), any(), any()))
+            .thenReturn(new MentorReviewQueueView(
+                List.of(), ReviewStatus.LLM_EVALUATED, 0L, 0L, List.of(), List.of()));
     }
 
     @Test

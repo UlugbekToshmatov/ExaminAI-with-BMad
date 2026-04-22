@@ -75,3 +75,8 @@
 - `Course` entity has no `equals`/`hashCode` override — identity-based comparison; subtle bugs possible in set/cache operations (Course.java)
 - `create_savesCourseWithCorrectFields` test does not assert `dateCreated` — `@PrePersist` not invoked in Mockito context; lifecycle behavior untested (CourseServiceTest.java:27)
 - No `CourseControllerTest` — form binding, redirect, and validation re-render untested at controller level
+
+## Deferred from: code review of 4-1-mentor-review-queue.md (2026-04-22)
+
+- `SecurityIntegrationTest` still only stubs an empty mentor queue — no integration assertion that real data scoping matches AC 3/4; consistent with existing shallow slice (SecurityIntegrationTest.java)
+- No `@DataJpaTest` for `TaskReviewRepository.findMentorQueue` JPQL — story listed repository tests as optional (TaskReviewRepository.java)

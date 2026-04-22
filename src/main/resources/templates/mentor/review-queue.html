@@ -2,11 +2,119 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout/base}">
-<head><title>Reviews</title></head>
+<head><title>Review queue</title></head>
 <body>
 <main id="main-content" layout:fragment="content">
-    <h4>Mentor Review Queue</h4>
-    <p class="text-muted">Review queue coming in Story 4.1.</p>
+    <h1 class="h4 mb-3">Mentor review queue</h1>
+
+    <form th:action="@{/mentor/reviews}" method="get" class="row g-2 align-items-end mb-3" id="mentor-review-filters" aria-label="Filter reviews">
+        <div class="col-md-4 col-lg-3">
+            <label for="filter-status" class="form-label small mb-0">Status</label>
+            <select id="filter-status" name="status" class="form-select form-select-sm"
+                    onchange="this.form.submit()" aria-label="Status filter">
+                <option th:each="s : ${T(com.examinai.review.ReviewStatus).values()}"
+                        th:value="${s.name()}"
+                        th:selected="${queue.selectedStatus == s}"
+                        th:text="${s.getDisplayLabel()}">Status</option>
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <label for="filter-intern" class="form-label small mb-0">Intern</label>
+            <select id="filter-intern" name="internId" class="form-select form-select-sm"
+                    onchange="this.form.submit()" aria-label="Intern filter">
+                <option value="" th:selected="${queue.selectedInternId == 0}">All interns</option>
+                <option th:each="o : ${queue.internOptions}"
+                        th:value="${o.id}"
+                        th:selected="${queue.selectedInternId == o.id}"
+                        th:text="${o.label}">Intern</option>
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <label for="filter-task" class="form-label small mb-0">Task</label>
+            <select id="filter-task" name="taskId" class="form-select form-select-sm"
+                    onchange="this.form.submit()" aria-label="Task filter">
+                <option value="" th:selected="${queue.selectedTaskId == 0}">All tasks</option>
+                <option th:each="o : ${queue.taskOptions}"
+                        th:value="${o.id}"
+                        th:selected="${queue.selectedTaskId == o.id}"
+                        th:text="${o.label}">Task</option>
+            </select>
+        </div>
+    </form>
+
+    <th:block th:if="${queue.reviews == null or queue.reviews.isEmpty()}">
+        <div class="card border-secondary-subtle" role="status">
+            <div class="card-body">
+                No reviews awaiting your decision. Check back after interns submit.
+            </div>
+        </div>
+    </th:block>
+
+    <th:block th:unless="${queue.reviews == null or queue.reviews.isEmpty()}">
+        <div class="table-responsive">
+            <table class="table table-hover" aria-label="Reviews ready for your decision">
+                <thead>
+                <tr>
+                    <th scope="col">Intern Name</th>
+                    <th scope="col">Task Name</th>
+                    <th scope="col">AI Verdict</th>
+                    <th scope="col">Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${queue.reviews}" class="mentor-review-row">
+                    <td>
+                        <a th:href="@{/mentor/reviews/{id}(id=${r.id})}"
+                           class="text-decoration-none text-body d-block"
+                           th:aria-label="|Open review for ${r.task.taskName}|"
+                           th:text="${r.intern.username}">Intern</a>
+                    </td>
+                    <td>
+                        <a th:href="@{/mentor/reviews/{id}(id=${r.id})}"
+                           class="text-decoration-none text-body d-block"
+                           tabindex="-1" aria-hidden="true"
+                           th:text="${r.task.taskName}">Task</a>
+                    </td>
+                    <td>
+                        <a th:href="@{/mentor/reviews/{id}(id=${r.id})}"
+                           class="text-decoration-none text-body d-block"
+                           tabindex="-1" aria-hidden="true">
+                            <th:block th:if="${r.llmResult == null or r.llmResult.isBlank()}">
+                                <span class="badge text-bg-secondary">—</span>
+                            </th:block>
+                            <th:block th:if="${r.llmResult != null and !r.llmResult.isBlank()}"
+                                      th:with="upper=${#strings.toUpperCase(r.llmResult)}, short=${#strings.abbreviate(upper, 24)}">
+                                <span th:if="${upper == 'APPROVE'}"
+                                      class="badge text-bg-success text-truncate d-inline-block"
+                                      style="max-width: 12rem"
+                                      th:title="${r.llmResult}"
+                                      th:text="${short}">APPROVE</span>
+                                <span th:if="${upper == 'REJECT'}"
+                                      class="badge text-bg-danger text-truncate d-inline-block"
+                                      style="max-width: 12rem"
+                                      th:title="${r.llmResult}"
+                                      th:text="${short}">REJECT</span>
+                                <span th:if="${upper != 'APPROVE' and upper != 'REJECT'}"
+                                      class="badge text-bg-secondary text-truncate d-inline-block"
+                                      style="max-width: 12rem"
+                                      th:title="${r.llmResult}"
+                                      th:text="${short}">OTHER</span>
+                            </th:block>
+                        </a>
+                    </td>
+                    <td>
+                        <a th:href="@{/mentor/reviews/{id}(id=${r.id})}"
+                           class="text-decoration-none text-body d-block"
+                           tabindex="-1" aria-hidden="true">
+                            <th:block
+                                th:replace="~{fragments/review-status-badge :: statusBadge(${r.status})}"></th:block>
+                        </a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </th:block>
 </main>
 </body>
 </html>
