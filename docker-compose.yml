@@ -1,0 +1,60 @@
+# Stack: postgres, ollama, app — all config/secrets via .env (env_file); do not add secrets here.
+# Run from repo root: docker compose up --build
+
+name: examinai
+
+services:
+  postgres:
+    image: postgres:16
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: examinai
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USERNAME} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Ollama: first `docker compose up` can take a long time while `deepseek-r1:8b` downloads.
+  # Health `start_period` / `retries` are relaxed for slow links; entrypoint is unchanged (code review D1, option 1).
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    image: examinai-ollama:local
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull deepseek-r1:8b && wait"]
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 20
+      start_period: 1200s
+
+  app:
+    build: .
+    image: examinai-app:local
+    env_file: .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
+
+volumes:
+  db-data:
+  ollama-models:

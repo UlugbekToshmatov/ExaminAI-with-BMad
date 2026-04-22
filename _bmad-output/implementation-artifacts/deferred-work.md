@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of 6-1-production-ready-docker-compose-deployment.md (2026-04-22)
+
+- Ollama custom image leaves the effective runtime user as `root` and binds model storage under `/root/.ollama` to match the named volume; switching to a non-root Ollama user would require realigning the volume path and `USER` in `Dockerfile.ollama` with the upstream image’s expectations (Dockerfile.ollama, docker-compose ollama service).
+- `docker-compose.yml` uses tag-based `image:` references and sets no CPU/memory `deploy` limits — acceptable for the story; consider digest pinning and resource limits for stricter production clusters (defense-in-depth, out of current AC scope).
+
 ## Deferred from: code review of 1-1-project-scaffold-base-configuration (2026-04-20)
 
 - `GITHUB_TOKEN` env var in `.env.example` not wired into `application.yml` — intended for Story 3.x AI review pipeline (.env.example:4)

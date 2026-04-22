@@ -1,0 +1,13 @@
+target
+.git
+.github
+.cursor
+.claude
+_bmad-output
+**/.DS_Store
+*.md
+.idea
+.vscode
+*.iml
+.env
+.env.local
