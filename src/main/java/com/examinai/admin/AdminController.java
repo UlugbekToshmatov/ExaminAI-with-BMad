@@ -16,14 +16,23 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminController {
 
     private final UserAccountService userAccountService;
+    private final AdminDashboardService adminDashboardService;
 
-    public AdminController(UserAccountService userAccountService) {
+    public AdminController(
+        UserAccountService userAccountService,
+        AdminDashboardService adminDashboardService) {
         this.userAccountService = userAccountService;
+        this.adminDashboardService = adminDashboardService;
     }
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasRole('ADMIN')")
-    public String dashboard() {
+    public String dashboard(
+        @RequestParam(value = "internId", required = false) String internId,
+        @RequestParam(value = "taskId", required = false) String taskId,
+        @RequestParam(value = "status", required = false) String status,
+        Model model) {
+        model.addAttribute("adminDashboard", adminDashboardService.loadDashboard(internId, taskId, status));
         return "admin/dashboard";
     }
 

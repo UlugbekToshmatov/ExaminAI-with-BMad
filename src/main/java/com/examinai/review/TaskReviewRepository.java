@@ -128,4 +128,56 @@ public interface TaskReviewRepository extends JpaRepository<TaskReview, Long> {
         WHERE tr.id = :id
         """)
     Optional<TaskReview> findByIdForMentorDetail(@Param("id") Long id);
+
+    /**
+     * Admin dashboard: all task reviews (no mentor scoping) with full graph for list rendering.
+     * Use {@code 0L} for {@code internFilter} or {@code taskFilter} to mean "any". Pass {@code null}
+     * for {@code status} to include every {@link ReviewStatus}.
+     */
+    @Query("""
+        SELECT DISTINCT tr FROM TaskReview tr
+        JOIN FETCH tr.task t
+        JOIN FETCH t.course
+        JOIN FETCH tr.intern
+        WHERE (0L = :internFilter OR tr.intern.id = :internFilter)
+        AND (0L = :taskFilter OR t.id = :taskFilter)
+        AND (:status IS NULL OR tr.status = :status)
+        ORDER BY tr.dateCreated DESC
+        """)
+    List<TaskReview> findAdminDashboardRows(
+        @Param("internFilter") long internFilter,
+        @Param("taskFilter") long taskFilter,
+        @Param("status") ReviewStatus status);
+
+    /**
+     * Intern options for admin filters: respect task + status (use {@code 0L} / {@code null} for any).
+     */
+    @Query("""
+        SELECT DISTINCT new com.examinai.review.MentorQueueLabelValue(i.id, i.username)
+        FROM TaskReview tr
+        JOIN tr.intern i
+        JOIN tr.task t
+        WHERE (0L = :taskFilter OR t.id = :taskFilter)
+        AND (:status IS NULL OR tr.status = :status)
+        ORDER BY i.username
+        """)
+    List<MentorQueueLabelValue> findAdminDashboardInternOptions(
+        @Param("taskFilter") long taskFilter,
+        @Param("status") ReviewStatus status);
+
+    /**
+     * Task options for admin filters: respect intern + status (use {@code 0L} / {@code null} for any).
+     */
+    @Query("""
+        SELECT DISTINCT new com.examinai.review.MentorQueueLabelValue(t.id, t.taskName)
+        FROM TaskReview tr
+        JOIN tr.task t
+        JOIN tr.intern i
+        WHERE (0L = :internFilter OR i.id = :internFilter)
+        AND (:status IS NULL OR tr.status = :status)
+        ORDER BY t.taskName
+        """)
+    List<MentorQueueLabelValue> findAdminDashboardTaskOptions(
+        @Param("internFilter") long internFilter,
+        @Param("status") ReviewStatus status);
 }

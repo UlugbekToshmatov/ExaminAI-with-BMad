@@ -1,6 +1,8 @@
 package com.examinai.user;
 
 import com.examinai.admin.AdminController;
+import com.examinai.admin.AdminDashboardService;
+import com.examinai.admin.AdminDashboardView;
 import com.examinai.config.SecurityConfig;
 import com.examinai.review.InternReviewStatusController;
 import com.examinai.review.MentorReviewController;
@@ -62,6 +64,9 @@ class SecurityIntegrationTest {
     MentorReviewService mentorReviewService;
 
     @MockBean
+    AdminDashboardService adminDashboardService;
+
+    @MockBean
     ReviewPersistenceService reviewPersistenceService;
 
     @BeforeEach
@@ -83,6 +88,9 @@ class SecurityIntegrationTest {
         when(mentorReviewService.loadQueue(any(), any(), any(), any()))
             .thenReturn(new MentorReviewQueueView(
                 List.of(), ReviewStatus.LLM_EVALUATED, 0L, 0L, List.of(), List.of()));
+        when(adminDashboardService.loadDashboard(any(), any(), any()))
+            .thenReturn(new AdminDashboardView(
+                List.of(), null, 0L, 0L, List.of(), List.of()));
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
 import java.util.concurrent.Executor;
 
 @Configuration
@@ -23,6 +24,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(120);
         executor.setThreadNamePrefix("async-");
+        executor.setRejectedExecutionHandler(new CallerRunsWithWarningHandler());
         executor.initialize();
         return executor;
     }

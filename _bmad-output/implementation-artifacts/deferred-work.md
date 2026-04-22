@@ -46,7 +46,7 @@
 
 - GitHub token potentially logged via Spring DEBUG HTTP logging — `RestClient` logs `Authorization` headers at DEBUG level when Spring web debug logging is enabled; add a header-masking interceptor or document as a deployment runbook constraint (GitHubClientConfig.java:19)
 - LLM JSON embedded in prose not handled by `LlmOutputSanitizer` — sanitizer strips `<think>` blocks and fenced JSON but cannot extract JSON buried in plain prose text; edge case as model/prompt evolves (LlmOutputSanitizer.java:13)
-- Thread pool rejection silently loses pipeline submission — when `AsyncConfig` executor is saturated, `TaskRejectedException` from `@Async` dispatch propagates through Spring's `afterCommit()` callback and leaves `TaskReview` stuck in PENDING permanently; add a rejection policy or a startup-time `TaskReviewRepository.resetStalePending()` recovery hook (AsyncConfig.java:20)
+- Thread pool rejection silently loses pipeline submission — **Mitigated 2026-04-22:** `AsyncConfig` uses `CallerRunsWithWarningHandler` (`CallerRunsPolicy` + WARN when saturated). Optional: startup `TaskReviewRepository.resetStalePending()` for rows stuck before deploy or from other failure modes (AsyncConfig.java)
 
 ## Deferred from: code review of 3-2-review-status-polling-live-status-updates (2026-04-22)
 

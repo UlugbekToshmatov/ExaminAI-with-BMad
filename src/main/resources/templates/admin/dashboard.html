@@ -2,11 +2,86 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout/base}">
-<head><title>Admin Dashboard</title></head>
+<head><title>Admin dashboard</title></head>
 <body>
 <main id="main-content" layout:fragment="content">
-    <h4>Admin Dashboard</h4>
-    <p class="text-muted">Admin dashboard coming in Story 5.2.</p>
+    <h1 class="h4 mb-3">Admin dashboard</h1>
+
+    <form th:action="@{/admin/dashboard}" method="get" class="row g-2 align-items-end mb-3" id="admin-dashboard-filters" aria-label="Filter submissions">
+        <div class="col-md-4 col-lg-3">
+            <label for="filter-intern" class="form-label small mb-0">Intern</label>
+            <select id="filter-intern" name="internId" class="form-select form-select-sm"
+                    onchange="this.form.submit()" aria-label="Intern filter">
+                <option value="" th:selected="${adminDashboard.selectedInternId == 0}">All interns</option>
+                <option th:each="o : ${adminDashboard.internOptions}"
+                        th:value="${o.id}"
+                        th:selected="${adminDashboard.selectedInternId == o.id}"
+                        th:text="${o.label}">Intern</option>
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <label for="filter-task" class="form-label small mb-0">Task</label>
+            <select id="filter-task" name="taskId" class="form-select form-select-sm"
+                    onchange="this.form.submit()" aria-label="Task filter">
+                <option value="" th:selected="${adminDashboard.selectedTaskId == 0}">All tasks</option>
+                <option th:each="o : ${adminDashboard.taskOptions}"
+                        th:value="${o.id}"
+                        th:selected="${adminDashboard.selectedTaskId == o.id}"
+                        th:text="${o.label}">Task</option>
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <label for="filter-status" class="form-label small mb-0">Status</label>
+            <select id="filter-status" name="status" class="form-select form-select-sm"
+                    onchange="this.form.submit()" aria-label="Status filter">
+                <option value="" th:selected="${adminDashboard.selectedStatus == null}">All statuses</option>
+                <option th:each="s : ${T(com.examinai.review.ReviewStatus).values()}"
+                        th:value="${s.name()}"
+                        th:selected="${adminDashboard.selectedStatus != null and adminDashboard.selectedStatus == s}"
+                        th:text="${s.getDisplayLabel()}">Status</option>
+            </select>
+        </div>
+    </form>
+
+    <th:block th:if="${adminDashboard.reviews == null or adminDashboard.reviews.isEmpty()}">
+        <p class="text-muted" role="status">No submissions yet.</p>
+    </th:block>
+
+    <th:block th:unless="${adminDashboard.reviews == null or adminDashboard.reviews.isEmpty()}">
+        <div class="table-responsive">
+            <table class="table table-hover" aria-label="All task submissions">
+                <thead>
+                <tr>
+                    <th scope="col">Intern Name</th>
+                    <th scope="col">Task Name</th>
+                    <th scope="col">Course Name</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Date Submitted</th>
+                    <th scope="col">Mentor Remarks</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${adminDashboard.reviews}" class="admin-dashboard-row">
+                    <td th:text="${r.intern.username}">intern</td>
+                    <td th:text="${r.task.taskName}">task</td>
+                    <td th:text="${r.task.course.courseName}">course</td>
+                    <td>
+                        <th:block
+                            th:replace="~{fragments/review-status-badge :: statusBadge(${r.status})}"></th:block>
+                    </td>
+                    <td th:text="${#temporals.format(r.dateCreated, 'dd MMM yyyy HH:mm', T(java.util.Locale).ENGLISH)}">1 Jan 2026 12:00</td>
+                    <td>
+                        <th:block th:if="${r.mentorRemarks == null or r.mentorRemarks.isBlank()}">—</th:block>
+                        <th:block th:if="${r.mentorRemarks != null and !r.mentorRemarks.isBlank()}"
+                                  th:with="full=${r.mentorRemarks}, short=${#strings.abbreviate(r.mentorRemarks, 100)}">
+                            <span th:attr="title=${full}" th:text="${short}">Remarks</span>
+                        </th:block>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </th:block>
 </main>
 </body>
 </html>
