@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="aiIssueCard(issue)" class="card border-secondary-subtle shadow-sm mb-3 ai-content">
+    <div class="card-body" th:object="${issue}">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge rounded-pill text-bg-dark"
+                  th:text="*{line != null} ? 'Line ' + *{line} : '—'">Line 1</span>
+        </div>
+        <pre class="ai-code-block mb-3"
+             role="region"
+             th:attr="aria-label=*{line != null} ? 'Code at line ' + *{line} : 'Code snippet'"><code
+                th:text="*{code}">code</code></pre>
+        <p class="small text-secondary mb-1"><strong>Issue</strong></p>
+        <p class="mb-3" th:text="*{issue}">Issue text</p>
+        <p class="small text-secondary mb-1"><strong>Improvement</strong></p>
+        <p class="mb-0" th:text="*{improvement != null} ? *{improvement} : '—'">Improvement</p>
+    </div>
+</div>
+</body>
+</html>

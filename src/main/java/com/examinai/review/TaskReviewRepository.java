@@ -114,4 +114,18 @@ public interface TaskReviewRepository extends JpaRepository<TaskReview, Long> {
         WHERE tr.id = :id
         """)
     Optional<TaskReview> findByIdWithTaskAndTaskMentor(@Param("id") Long id);
+
+    /**
+     * Mentor review detail: one round-trip with task, course, task mentor, intern, and issues (no N+1 on issues).
+     */
+    @Query("""
+        SELECT DISTINCT tr FROM TaskReview tr
+        JOIN FETCH tr.task t
+        JOIN FETCH t.course
+        JOIN FETCH t.mentor
+        JOIN FETCH tr.intern
+        LEFT JOIN FETCH tr.issues
+        WHERE tr.id = :id
+        """)
+    Optional<TaskReview> findByIdForMentorDetail(@Param("id") Long id);
 }

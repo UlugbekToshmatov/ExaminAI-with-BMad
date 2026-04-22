@@ -28,4 +28,22 @@ public class AiReviewNotificationListener {
             log.warn("AI review notification handler swallowed error: {}", e.toString());
         }
     }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Async
+    public void onMentorDecision(MentorDecisionEvent event) {
+        try {
+            log.info(
+                "Mentor decision reviewId={} internId={} course={} task={} finalStatus={} remarksPresent={}",
+                event.reviewId(),
+                event.internId(),
+                event.courseName(),
+                event.taskName(),
+                event.finalStatus(),
+                event.remarks() != null && !event.remarks().isBlank()
+            );
+        } catch (RuntimeException e) {
+            log.warn("Mentor decision notification handler swallowed error: {}", e.toString());
+        }
+    }
 }

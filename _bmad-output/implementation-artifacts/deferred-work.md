@@ -80,3 +80,7 @@
 
 - `SecurityIntegrationTest` still only stubs an empty mentor queue — no integration assertion that real data scoping matches AC 3/4; consistent with existing shallow slice (SecurityIntegrationTest.java)
 - No `@DataJpaTest` for `TaskReviewRepository.findMentorQueue` JPQL — story listed repository tests as optional (TaskReviewRepository.java)
+
+## Deferred from: code review of 4-2-mentor-review-detail-ai-feedback-decision.md (2026-04-22)
+
+- Thymeleaf `#strings.toUpperCase` on `llmResult` uses the default locale — rare locales could mis-map verdict strings for the APPROVE/REJECT badges (`review-detail.html`, `mentor-action-panel.html`)

@@ -6,12 +6,12 @@ import com.examinai.review.InternReviewStatusController;
 import com.examinai.review.MentorReviewController;
 import com.examinai.review.MentorReviewQueueView;
 import com.examinai.review.MentorReviewService;
+import com.examinai.review.ReviewPersistenceService;
 import com.examinai.review.ReviewStatus;
 import com.examinai.review.ReviewSubmissionController;
 import com.examinai.review.ReviewPipelineService;
 import com.examinai.review.TaskReview;
 import com.examinai.review.TaskReviewRepository;
-import com.examinai.review.ReviewStatus;
 import com.examinai.task.InternTaskController;
 import com.examinai.task.TaskService;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +60,9 @@ class SecurityIntegrationTest {
 
     @MockBean
     MentorReviewService mentorReviewService;
+
+    @MockBean
+    ReviewPersistenceService reviewPersistenceService;
 
     @BeforeEach
     void setUp() {

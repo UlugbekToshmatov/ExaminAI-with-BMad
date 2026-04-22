@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title th:text="'Review: ' + ${taskReview.task.taskName}">Review</title>
+</head>
+<body>
+<main id="main-content" layout:fragment="content">
+    <nav class="mb-3" aria-label="Breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a th:href="@{/mentor/reviews}">Review Queue</a></li>
+            <li class="breadcrumb-item active" aria-current="page"
+                th:text="${taskReview.intern.username} + ' — ' + ${taskReview.task.taskName}">Intern — Task</li>
+        </ol>
+    </nav>
+
+    <header class="mb-4">
+        <h1 class="h4 mb-2" th:text="${taskReview.intern.username} + ' — ' + ${taskReview.task.taskName}">Review</h1>
+        <p class="text-muted small mb-1">
+            <span class="me-1">Course:</span>
+            <span th:text="${taskReview.task.course.courseName}">Course</span>
+        </p>
+        <p class="mb-0" th:with="upper=${taskReview.llmResult != null} ? ${#strings.toUpperCase(taskReview.llmResult)} : ''">
+            <th:block th:if="${taskReview.llmResult == null or taskReview.llmResult.isBlank()}">
+                <span class="badge text-bg-secondary">AI Suggestion: —</span>
+            </th:block>
+            <th:block th:if="${taskReview.llmResult != null and !taskReview.llmResult.isBlank()}">
+                <span th:if="${upper == 'APPROVE'}" class="badge text-bg-success">AI Suggestion: APPROVE</span>
+                <span th:if="${upper == 'REJECT'}" class="badge text-bg-danger">AI Suggestion: REJECT</span>
+                <span th:if="${upper != 'APPROVE' and upper != 'REJECT'}" class="badge text-bg-secondary"
+                      th:text="${'AI Suggestion: ' + #strings.abbreviate(upper, 20)}">AI Suggestion</span>
+            </th:block>
+        </p>
+    </header>
+
+    <div class="row g-4">
+        <div class="col-12 col-md-8 order-1">
+            <h2 class="h6 text-secondary text-uppercase small mb-3">AI feedback</h2>
+            <th:block th:if="${taskReview.issues == null or taskReview.issues.isEmpty()}">
+                <p class="text-muted">No issues were flagged for this review.</p>
+            </th:block>
+            <div th:each="issueRow : ${taskReview.issues}">
+                <th:block th:insert="~{fragments/ai-feedback-card :: aiIssueCard(issue=${issueRow})}"></th:block>
+            </div>
+        </div>
+        <div class="col-12 col-md-4 order-2">
+            <h2 class="h6 text-secondary text-uppercase small mb-3">Decision</h2>
+            <div th:replace="~{fragments/mentor-action-panel :: mentorActionPanel(review=${taskReview})}"></div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

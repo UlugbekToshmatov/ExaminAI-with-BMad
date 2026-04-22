@@ -132,7 +132,7 @@ class MentorReviewServiceTest {
         task.setMentor(taskMentor);
         TaskReview tr = new TaskReview();
         tr.setTask(task);
-        when(taskReviewRepository.findByIdWithTaskAndTaskMentor(5L)).thenReturn(Optional.of(tr));
+        when(taskReviewRepository.findByIdForMentorDetail(5L)).thenReturn(Optional.of(tr));
 
         UserAccount other = mock(UserAccount.class);
         when(other.getId()).thenReturn(99L);
@@ -155,7 +155,7 @@ class MentorReviewServiceTest {
         TaskReview tr = new TaskReview();
         tr.setId(7L);
         tr.setTask(task);
-        when(taskReviewRepository.findByIdWithTaskAndTaskMentor(7L)).thenReturn(Optional.of(tr));
+        when(taskReviewRepository.findByIdForMentorDetail(7L)).thenReturn(Optional.of(tr));
 
         Authentication auth = new UsernamePasswordAuthenticationToken(
             "admin", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));

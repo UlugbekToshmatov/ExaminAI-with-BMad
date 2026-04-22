@@ -47,22 +47,42 @@ public class MentorReviewService {
     }
 
     /**
-     * Loads a review for the placeholder detail page; enforces mentor scope (admin sees all).
+     * Loads a review for the detail page; enforces mentor scope (admin sees all).
+     * Uses a single query with task, course, intern, task mentor, and issues.
      */
     @Transactional(readOnly = true)
     public TaskReview getReviewForDetailOrThrow(long reviewId, Authentication auth) {
-        TaskReview tr = taskReviewRepository.findByIdWithTaskAndTaskMentor(reviewId)
+        TaskReview tr = loadMentorDetailOrThrow(reviewId);
+        assertMentorScopeForReview(tr, auth);
+        return tr;
+    }
+
+    /**
+     * Verifies the current user may approve/reject this review (same rules as
+     * {@link #getReviewForDetailOrThrow(long, Authentication)} for GET).
+     * Call before {@link ReviewPersistenceService#saveMentorDecision(Long, boolean, String)}.
+     */
+    @Transactional(readOnly = true)
+    public void ensureMentorCanActOnReview(long reviewId, Authentication auth) {
+        TaskReview tr = loadMentorDetailOrThrow(reviewId);
+        assertMentorScopeForReview(tr, auth);
+    }
+
+    private TaskReview loadMentorDetailOrThrow(long reviewId) {
+        return taskReviewRepository.findByIdForMentorDetail(reviewId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    private void assertMentorScopeForReview(TaskReview tr, Authentication auth) {
         if (isAdmin(auth)) {
-            return tr;
+            return;
         }
-        UserAccount mentor = tr.getTask().getMentor();
+        UserAccount taskMentor = tr.getTask().getMentor();
         UserAccount current = userAccountRepository.findByUsername(auth.getName())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
-        if (mentor.getId() == null || !mentor.getId().equals(current.getId())) {
+        if (taskMentor.getId() == null || !taskMentor.getId().equals(current.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        return tr;
     }
 
     public boolean isAdmin(Authentication auth) {
