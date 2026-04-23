@@ -11,3 +11,11 @@ _bmad-output
 *.iml
 .env
 .env.local
+
+# Smaller build context (Dockerfile uses image Maven, not the wrapper)
+mvnw
+mvnw.cmd
+.mvn
+
+**/*.log
+**/logs

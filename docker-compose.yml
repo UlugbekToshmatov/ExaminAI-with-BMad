@@ -1,11 +1,15 @@
 # Stack: postgres, ollama, app — all config/secrets via .env (env_file); do not add secrets here.
-# Run from repo root: docker compose up --build
+# Run from repo root:
+#   docker compose up -d          — routine restarts (reuse built images; no registry pull if tags unchanged)
+#   docker compose up -d --build  — only after Dockerfile / pom / app deps / base image tag bumps
+# Pin image tags below and bump deliberately to avoid surprise layer churn and re-pulls.
 
 name: examinai
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16.13
+    pull_policy: missing
     env_file: .env
     environment:
       POSTGRES_USER: ${DB_USERNAME}
@@ -27,6 +31,7 @@ services:
       context: .
       dockerfile: Dockerfile.ollama
     image: examinai-ollama:local
+    pull_policy: never
     entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull deepseek-r1:8b && wait"]
     volumes:
       - ollama-models:/root/.ollama
@@ -40,6 +45,7 @@ services:
   app:
     build: .
     image: examinai-app:local
+    pull_policy: never
     env_file: .env
     ports:
       - "8080:8080"

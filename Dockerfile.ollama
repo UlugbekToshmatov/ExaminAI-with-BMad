@@ -1,6 +1,7 @@
 # Extends ollama/ollama: Ubuntu-based runtime omits curl; AC3 healthcheck requires
 # curl to http://localhost:11434/api/tags (see https://github.com/ollama/ollama/issues/9781)
-FROM ollama/ollama
+# Pin Ollama release; bump tag when upgrading Ollama (avoids implicit :latest churn).
+FROM ollama/ollama:0.18.2
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \

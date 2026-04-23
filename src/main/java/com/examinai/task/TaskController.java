@@ -114,6 +114,8 @@ public class TaskController {
     }
 
     private String baseTaskUrl(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/admin") ? "/admin/tasks" : "/mentor/tasks";
+        String ctx = request.getContextPath();
+        String uri = request.getRequestURI();
+        return uri.startsWith(ctx + "/admin") ? ctx + "/admin/tasks" : ctx + "/mentor/tasks";
     }
 }

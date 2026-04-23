@@ -37,7 +37,7 @@ public class TaskService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasRole('MENTOR') or hasRole('ADMIN')")
     public List<Task> findAll() {
-        return taskRepository.findAllByOrderByTaskNameAsc();
+        return taskRepository.findAllWithCourseAndMentorOrderByTaskNameAsc();
     }
 
     @Transactional(readOnly = true)

@@ -99,6 +99,8 @@ public class CourseController {
     }
 
     private String baseCourseUrl(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/admin") ? "/admin/courses" : "/mentor/courses";
+        String ctx = request.getContextPath();
+        String uri = request.getRequestURI();
+        return uri.startsWith(ctx + "/admin") ? ctx + "/admin/courses" : ctx + "/mentor/courses";
     }
 }

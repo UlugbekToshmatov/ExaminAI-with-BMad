@@ -9,6 +9,9 @@ import java.util.Optional;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findAllByOrderByTaskNameAsc();
 
+    @Query("SELECT DISTINCT t FROM Task t JOIN FETCH t.course JOIN FETCH t.mentor ORDER BY t.taskName ASC")
+    List<Task> findAllWithCourseAndMentorOrderByTaskNameAsc();
+
     @Query("SELECT t FROM Task t JOIN FETCH t.course ORDER BY t.taskName ASC")
     List<Task> findAllWithCourseOrderByTaskNameAsc();
 
