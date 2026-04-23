@@ -64,13 +64,13 @@ NFR9: Every protected endpoint enforces role authorization server-side; Thymelea
 NFR10: HTTP sessions expire after a period of inactivity (configurable via Spring Security; target: 1 hour)
 NFR11: No PR diff content, mentor remarks, or review feedback exposed to users outside their authorized role scope
 NFR12: GitHub API errors 404/403/429 each result in an ERROR review state with a user-visible message — no application crash
-NFR13: Ollama LLM maximum request timeout of 120 seconds; if exceeded, review recorded as ERROR
-NFR14: LLM response parsing: <think>...</think> reasoning tokens stripped before JSON parsing; if still fails, review recorded as ERROR rather than silently dropped
+NFR13: Ollama LLM HTTP read timeout is configurable (`examinai.ai.ollama-read-timeout-ms`; default 15 minutes for CPU inference); if exceeded, review recorded as ERROR
+NFR14: LLM response parsing: output normalized via `LlmOutputSanitizer` (reasoning tags, markdown fences, prose around JSON) before `BeanOutputConverter`; if parsing still fails, review recorded as ERROR rather than silently dropped
 NFR15: SMTP email delivery failures are logged but do not block the review pipeline — review state updated in DB regardless of notification outcome
 NFR16: Every task submission persisted as a TaskReview row with status PENDING before any external API call — no submission lost due to downstream failure
 NFR17: Liquibase schema migration completes successfully before the application serves HTTP traffic
 NFR18: PostgreSQL data persists across container restarts via a named Docker volume (db-data)
-NFR19: Ollama model data (deepseek-r1:8b, ~4.7 GB) persists across container restarts via a named Docker volume (ollama-models)
+NFR19: Ollama model data (qwen2.5-coder:3b, ~2 GB) persists across container restarts via a named Docker volume (ollama-models)
 NFR20: Async review thread pool configured with graceful shutdown: in-flight reviews complete before application exits (awaitTerminationSeconds: 120)
 
 ### Additional Requirements
@@ -86,7 +86,7 @@ NFR20: Async review thread pool configured with graceful shutdown: in-flight rev
 - Spring Events: AiReviewCompleteEvent (reviewId, mentorId, internName, courseName, taskName) and MentorDecisionEvent (reviewId, internId, courseName, taskName, finalStatus, remarks)
 - Write-first pipeline rule: persist PENDING to DB before any external call, then publish async event, then return 202
 - State transitions enforced only in ReviewPipelineService: PENDING→LLM_EVALUATED, PENDING→ERROR, LLM_EVALUATED→APPROVED, LLM_EVALUATED→REJECTED
-- LLM response processing order: strip <think> tokens → strip markdown fences → BeanOutputConverter parse → ERROR on failure
+- LLM response processing order: LlmOutputSanitizer (reasoning tags / fences / prose) → JSON object extraction if needed → BeanOutputConverter parse → ERROR on failure
 - PRG (Post-Redirect-Get) pattern mandatory on all form handlers — PostMapping always returns "redirect:/..."
 - @PreAuthorize on every controller method individually (not class-level only)
 - Docker Compose with 3 services (app + postgres + ollama) with healthchecks and condition: service_healthy; named volumes db-data and ollama-models
@@ -803,7 +803,7 @@ So that anyone can run the full stack locally or in production without manual co
 **Given** the `ollama` service in `docker-compose.yml`
 **When** the file is inspected
 **Then** it uses image `ollama/ollama`, mounts the `ollama-models` named volume at `/root/.ollama`, and has a healthcheck: `curl -f http://localhost:11434/api/tags`
-**And** its entrypoint is `/bin/sh -c "ollama serve & sleep 5 && ollama pull deepseek-r1:8b && wait"` — pre-pulling the model on first start so it is available before the app serves any review requests
+**And** its entrypoint is `/bin/sh -c "ollama serve & sleep 5 && ollama pull qwen2.5-coder:3b && wait"` — pre-pulling the model on first start so it is available before the app serves any review requests
 
 **Given** the `app` service in `docker-compose.yml`
 **When** the file is inspected
@@ -824,7 +824,7 @@ So that anyone can run the full stack locally or in production without manual co
 **When** postgres restarts and becomes healthy
 **Then** all previously created `TaskReview`, `Course`, `Task`, and `UserAccount` records are still present — data is not lost on container restart
 
-**Given** the Ollama container restarts after `deepseek-r1:8b` was already pulled
+**Given** the Ollama container restarts after `qwen2.5-coder:3b` was already pulled
 **When** the container starts
 **Then** the model is available immediately from the `ollama-models` volume — no re-download occurs
 

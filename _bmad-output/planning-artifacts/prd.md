@@ -20,7 +20,7 @@ classification:
 
 ## Executive Summary
 
-ExaminAI is a web-based code review platform that eliminates the mentor bottleneck in intern training programs. Interns submit GitHub pull requests for assigned tasks; a locally-hosted AI (deepseek-r1:8b via Ollama) produces structured, line-level feedback within seconds; mentors review the AI draft and make the final approve/reject decision. Interns receive feedback in under 90 seconds instead of hours or days; mentors spend 2 minutes per review instead of 20.
+ExaminAI is a web-based code review platform that eliminates the mentor bottleneck in intern training programs. Interns submit GitHub pull requests for assigned tasks; a locally-hosted AI (`qwen2.5-coder:3b` via Ollama) produces structured, line-level feedback asynchronously—typically minutes on CPU for modest diffs, bounded by a configurable Ollama HTTP read timeout (default 15 minutes); mentors review the AI draft and make the final approve/reject decision. Interns get structured feedback far sooner than manual queue times; mentors spend about 2 minutes per review instead of 20.
 
 **Target users:**
 - **Interns** — software development trainees submitting code for structured tasks
@@ -33,7 +33,7 @@ Mentor availability is the single biggest constraint on intern progression throu
 
 The AI never replaces the mentor's judgment — it replaces their reading time. Mentors receive a structured AI draft (flagged issues, code references, suggested verdict) and make the final call. Human accountability is preserved; the bottleneck is eliminated.
 
-The platform runs on a **locally-hosted LLM** (Ollama + deepseek-r1:8b) — zero per-review API cost, all code stays on-premises, no scaling costs as the intern cohort grows.
+The platform runs on a **locally-hosted LLM** (Ollama + qwen2.5-coder:3b) — zero per-review API cost, all code stays on-premises, no scaling costs as the intern cohort grows.
 
 The async review pipeline (submit → 202 Accepted → poll → notification) ensures interns are never blocked waiting for a UI response during 10–60 second LLM inference.
 
@@ -60,7 +60,7 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 
 ### Technical Success
 
-- End-to-end review pipeline latency (submit → mentor email notification): < 90 seconds
+- AI review stage latency: bounded by configurable Ollama HTTP read timeout (default 15 minutes); `qwen2.5-coder:3b` targets much faster turnaround than larger reasoning models on CPU
 - LLM JSON parse success rate: > 95%
 - GitHub API error rate: < 1% (track 403/404/429 responses)
 - Application startup time (Liquibase migration + Ollama healthcheck): < 45 seconds
@@ -70,7 +70,7 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 
 | Metric | Target |
 |---|---|
-| Time to mentor notification | < 90 seconds |
+| Time to mentor notification after AI completes | Bounded by Ollama timeout (default 15m); typically minutes with 3B coder on CPU |
 | Mentor time per review | ≤ 2 minutes |
 | Mentor daily review capacity | ≥ 10 reviews/day |
 | Intern task completion rate | ≥ 80% on time |
@@ -81,7 +81,7 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 
 ### MVP Strategy
 
-**Approach:** Problem-solving MVP — prove that AI-assisted code review with human-in-the-loop mentor authority reduces review time to ≤ 2 minutes and delivers intern feedback in < 90 seconds. No feature is in scope unless it directly enables this loop.
+**Approach:** Problem-solving MVP — prove that AI-assisted code review with human-in-the-loop mentor authority reduces review time to ≤ 2 minutes and delivers structured AI feedback asynchronously without blocking the intern UI. No feature is in scope unless it directly enables this loop.
 
 **Resource requirements:** 1–2 Java developers with Spring Boot experience. Spring AI integration (Ollama, BeanOutputConverter, async pipeline) is the steepest learning curve — budget 1 week for this component. Docker Compose + Ollama administration requires basic DevOps familiarity. Solo developer build priority: (1) async pipeline + DB → (2) mentor review UI → (3) intern submission UI → (4) email notifications → (5) admin CRUD.
 
@@ -98,7 +98,7 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 - Course CRUD and Task CRUD (mentor/admin)
 - Intern task submission form (repo owner, repo name, PR number)
 - Async review pipeline: GitHub diff fetch → Ollama LLM → structured JSON → DB persist
-- `<think>` token stripping + BeanOutputConverter for deepseek-r1:8b
+- `LlmOutputSanitizer` + `BeanOutputConverter` for structured JSON from `qwen2.5-coder:3b`
 - Status polling endpoint (`GET /reviews/{reviewId}/status`) + JS polling every 3 seconds
 - Error state (`ERROR`) surfaced to intern UI when GitHub/LLM call fails
 - Mentor review UI: AI feedback display (line, code, issue, improvement) + approve/reject with remarks
@@ -120,7 +120,7 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 
 ### Phase 3 — Expansion (Vision)
 
-- Multi-LLM support: swap deepseek-r1 for other Ollama models or cloud APIs per course
+- Multi-LLM support: swap `qwen2.5-coder:3b` for other Ollama models or cloud APIs per course
 - Peer review: intern-to-intern review before mentor sees submission
 - CI/CD webhook: auto-trigger submission on GitHub PR open event
 - Cohort/group management with program-level reporting dashboard
@@ -132,7 +132,7 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| Spring AI + deepseek-r1 `<think>` token parsing failure | High | Regex strip before BeanOutputConverter; unit test with real model output sample |
+| Spring AI + LLM JSON not matching `ReviewFeedback` after sanitization | High | `LlmOutputSanitizer` + extract JSON object fallback; unit tests with fenced / prose-wrapped samples |
 | Ollama container OOM on low-RAM host | High | 16 GB RAM minimum; 4-bit quantized model as fallback |
 | GitHub API 404 / 403 on bad PR input | Medium | Validate API response before assembling prompt; surface `ERROR` state immediately |
 | Async thread pool exhaustion | Low | Configure core=15, max=30, queue=150 |
@@ -222,7 +222,7 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 
 ### Data Privacy & Code Confidentiality
 
-- Intern code (GitHub PR diffs) is processed exclusively by the locally-hosted LLM (Ollama + deepseek-r1:8b). No PR content is sent to external APIs or cloud services.
+- Intern code (GitHub PR diffs) is processed exclusively by the locally-hosted LLM (Ollama + qwen2.5-coder:3b). No PR content is sent to external APIs or cloud services.
 - GitHub PR data is fetched per review via a single authenticated API call. Data is not cached beyond the review cycle.
 - Interns submit from personal GitHub repositories. A fine-grained PAT (`GITHUB_TOKEN`) with repository read scope is sufficient — no organization-level permissions required.
 
@@ -259,21 +259,21 @@ The async review pipeline (submit → 202 Accepted → poll → notification) en
 
 **Human-in-the-loop code review pipeline:** ExaminAI separates AI capability from AI authority. The LLM performs the first-pass analysis (reading diffs, identifying issues, writing structured feedback); the mentor holds the final approve/reject decision. This is distinct from fully-automated review tools and from unaided human review — AI eliminates reading time without eliminating human judgment.
 
-**Zero-cost, on-premises LLM inference:** deepseek-r1:8b runs locally via Ollama (Docker container) — unlimited reviews with no per-call API cost and no external data exposure. Viable for any intern cohort size without scaling costs.
+**Zero-cost, on-premises LLM inference:** qwen2.5-coder:3b runs locally via Ollama (Docker container) — unlimited reviews with no per-call API cost and no external data exposure. Viable for any intern cohort size without scaling costs.
 
 **Async review UX in a synchronous-feeling product:** The 202 Accepted + client-side polling pattern delivers a non-blocking experience for a 10–60 second process — a UX challenge most internal tools handle poorly.
 
 ### Validation Approach
 
 - Mentor ≤ 2-minute review cycle is the primary validation signal — longer indicates AI feedback quality or UI layout failure.
-- LLM JSON parse success rate > 95% validates that the deepseek-r1:8b + think-token-stripping pipeline is production-reliable.
+- LLM JSON parse success rate > 95% validates that the `qwen2.5-coder:3b` + `LlmOutputSanitizer` pipeline is production-reliable.
 
 ### Innovation Risk Mitigations
 
 | Risk | Mitigation |
 |---|---|
-| deepseek-r1:8b produces low-quality feedback | Mentors can always override; poor AI output doesn't block the workflow |
-| Local LLM too slow on CPU-only hardware | Document 8 GB GPU VRAM minimum; 4-bit quantized model as fallback |
+| qwen2.5-coder:3b produces low-quality feedback | Mentors can always override; poor AI output doesn't block the workflow |
+| Local LLM too slow on CPU-only hardware | Default model `qwen2.5-coder:3b` targets CPU; increase `examinai.ai.ollama-read-timeout-ms` if needed; optional GPU or larger Ollama model for quality |
 | Async polling confuses interns | Clear UI state labels: Submitted / AI Reviewing / Awaiting Mentor / Approved / Rejected |
 
 ## Web Application Requirements
@@ -390,7 +390,7 @@ Performance requirements are specified in the Non-Functional Requirements sectio
 | Server-rendered page load | < 1 second | Internal network; Thymeleaf SSR should be near-instant |
 | Task submission endpoint (202 response) | < 500ms | Must feel immediate — intern should not wait for AI to start |
 | Status polling endpoint (`GET /reviews/{id}/status`) | < 200ms | DB read only; called every 3 seconds |
-| AI review pipeline (background) | < 90 seconds end-to-end | Submit → mentor email notification |
+| AI review pipeline (background) | Within Ollama read timeout (default 15m); typically faster with 3B coder | Submit → mentor email notification |
 | Login and form submit actions | < 1 second | Standard synchronous operations |
 
 ### Security
@@ -405,8 +405,8 @@ Performance requirements are specified in the Non-Functional Requirements sectio
 ### Integration
 
 - **GitHub API:** Errors 404 (invalid PR), 403 (token insufficient), 429 (rate limited) each result in an `ERROR` review state with a user-visible message — no application crash
-- **Ollama LLM:** Maximum request timeout of 120 seconds; if exceeded, review recorded as `ERROR`
-- **LLM response parsing:** `<think>...</think>` reasoning tokens stripped before JSON parsing; if parsing still fails, review recorded as `ERROR` rather than silently dropped
+- **Ollama LLM:** HTTP read timeout configurable (`examinai.ai.ollama-read-timeout-ms`; default 15 minutes); if exceeded, review recorded as `ERROR`
+- **LLM response parsing:** reasoning tags, markdown fences, and prose around JSON normalized (`LlmOutputSanitizer`) before parsing; if parsing still fails, review recorded as `ERROR` rather than silently dropped
 - **SMTP email:** Delivery failures are logged but do not block the review pipeline — review state is updated in DB regardless of notification outcome
 
 ### Reliability
@@ -414,5 +414,5 @@ Performance requirements are specified in the Non-Functional Requirements sectio
 - Every task submission persisted as a `TaskReview` row with status `PENDING` before any external API call — no submission lost due to downstream failure
 - Liquibase schema migration completes successfully before the application serves HTTP traffic
 - PostgreSQL data persists across container restarts via a named Docker volume
-- Ollama model data (deepseek-r1:8b, ~4.7 GB) persists across container restarts via a named Docker volume
+- Ollama model data (`qwen2.5-coder:3b`, ~2 GB) persists across container restarts via a named Docker volume
 - Async review thread pool configured with graceful shutdown: in-flight reviews complete before application exits (`awaitTerminationSeconds: 120`)

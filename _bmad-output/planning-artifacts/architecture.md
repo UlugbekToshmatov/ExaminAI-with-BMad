@@ -30,7 +30,7 @@ ExaminAI has 33 FRs across 7 capability groups:
 - **User Account Management (FR6–FR9):** Admin-only user creation/deactivation; BCrypt-hashed passwords (strength ≥12); seed data on startup
 - **Course & Task Management (FR10–FR13):** Mentor/Admin CRUD for Courses and Tasks; each Task FK-linked to a Course and owning Mentor
 - **Task Submission (FR14–FR19):** 3-field submission form (repoOwner, repoName, prNumber); 202 Accepted + reviewId returned immediately; 3-second client polling; ERROR state surfaces on GitHub/LLM failure with resubmit path; every attempt saved as a new `TaskReview` row
-- **AI Review Processing (FR20–FR23):** GitHub PR diff fetch via authenticated REST call; Ollama LLM invocation with structured JSON response; `<think>` token stripping + `BeanOutputConverter`; ERROR state persisted on failure
+- **AI Review Processing (FR20–FR23):** GitHub PR diff fetch via authenticated REST call; Ollama LLM invocation with structured JSON response; `LlmOutputSanitizer` + `BeanOutputConverter`; ERROR state persisted on failure
 - **Mentor Review & Decision (FR24–FR28):** Filtered queue view (`LLM_EVALUATED` default); AI feedback display with line/code/issue/improvement; approve or reject with optional remarks; mentor can override AI verdict
 - **Notifications (FR29–FR30):** Email to mentor when AI review completes; email to intern when mentor finalizes; SMTP failures logged but do not block review pipeline
 
@@ -38,9 +38,9 @@ ExaminAI has 33 FRs across 7 capability groups:
 
 | Area | Key Requirement | Architectural Impact |
 |---|---|---|
-| Performance | Submit endpoint < 500ms; status poll < 200ms; AI pipeline < 90s end-to-end | Async thread pool mandatory; DB read-only poll path must be fast |
+| Performance | Submit endpoint < 500ms; status poll < 200ms; AI pipeline bounded by configurable Ollama HTTP read timeout (default 15m on CPU) | Async thread pool mandatory; DB read-only poll path must be fast |
 | Security | BCrypt ≥12; no secrets in code; server-side role checks; session expiry | `@EnableMethodSecurity`; `@PreAuthorize` on all controllers/services |
-| Integration resilience | GitHub 404/403/429 → ERROR state; Ollama 120s timeout → ERROR state; SMTP failure → log only | All external calls must catch and surface structured errors |
+| Integration resilience | GitHub 404/403/429 → ERROR state; Ollama HTTP read timeout (configurable; default 15m) → ERROR state; SMTP failure → log only | All external calls must catch and surface structured errors |
 | Reliability | Every submission persisted as PENDING before external calls; Liquibase runs before HTTP traffic; data survives container restart | Write-first pipeline; Docker volumes for DB and Ollama model |
 
 **Scale & Complexity:**
@@ -53,7 +53,7 @@ ExaminAI has 33 FRs across 7 capability groups:
 
 - **Spring Boot 3.4.2+** — hard requirement for Spring AI 1.0.x compatibility (3.2.x incompatible)
 - **Spring AI 1.0.0 via BOM** — `spring-ai-ollama-spring-boot-starter`; BeanOutputConverter for structured output
-- **Ollama deepseek-r1:8b** — requires `<think>` token stripping; 120s max timeout; 8 GB GPU VRAM minimum; pre-pull in Docker entrypoint
+- **Ollama qwen2.5-coder:3b** — code-focused 3B model; `LlmOutputSanitizer` handles reasoning tags / fences / prose around JSON; configurable HTTP read timeout (default 15m for CPU); pre-pull in Docker entrypoint
 - **PostgreSQL 16 + Liquibase 4.31.1+** — schema migration completes before HTTP traffic; named Docker volume
 - **GitHub PAT (`GITHUB_TOKEN`)** — env var only; Bearer header only; never logged; fine-grained token with repo read scope
 - **No external cloud dependencies** — all inference is local; no third-party SaaS required for operation
@@ -224,12 +224,12 @@ src/main/resources/db/changelog/
 |---|---|---|
 | Deployment | Docker Compose (3 services: app, postgres, ollama) | Self-contained local deployment; no cloud account required |
 | Healthchecks | `pg_isready` on postgres; `curl /api/tags` on ollama; `condition: service_healthy` on app | Prevents Spring Boot starting before DB/Ollama are ready |
-| Data persistence | Named Docker volumes: `db-data`, `ollama-models` | Survives container restarts; Ollama model (~4.7 GB) persists |
+| Data persistence | Named Docker volumes: `db-data`, `ollama-models` | Survives container restarts; Ollama model (~2 GB for `qwen2.5-coder:3b`) persists |
 | Configuration | `.env` file → Docker Compose `env_file` → Spring `application.yml` | Single source for all secrets; never committed to VCS |
 | Environment profiles | `application.yml` (production defaults) + `application-dev.yml` (local dev overrides, no Docker hostnames) | Enables running app directly (IDE) vs. inside Docker Compose |
 | Logging | SLF4J + Logback defaults (Spring Boot built-in, plain text) | Sufficient for MVP; `docker logs` readable without tooling |
 | Monitoring | Spring Actuator `/actuator/health` endpoint | Used by Docker healthcheck for `app` service |
-| Ollama model init | `entrypoint: /bin/sh -c "ollama serve & sleep 5 && ollama pull deepseek-r1:8b && wait"` | Pre-pulls model on first start; named volume prevents re-download |
+| Ollama model init | `entrypoint: /bin/sh -c "ollama serve & sleep 5 && ollama pull qwen2.5-coder:3b && wait"` | Pre-pulls model on first start; named volume prevents re-download |
 | Scaling | Single-node (MVP) | Internal cohort size doesn't require horizontal scaling |
 
 ### Decision Impact Analysis
@@ -541,7 +541,7 @@ ReviewFeedback feedback = converter.convert(cleaned);
 - Catch all exceptions in async pipeline — update to ERROR, never re-throw
 - Place `@Transactional` on service methods only
 - Apply `@PreAuthorize` on every controller method individually
-- Strip `<think>` tokens and markdown fences before calling `BeanOutputConverter`
+- Run `LlmOutputSanitizer` (reasoning tags, markdown fences, embedded JSON) before calling `BeanOutputConverter`
 
 **Anti-Patterns to Reject:**
 - `@Transactional` on a `@Controller` or `@Repository`
@@ -589,7 +589,7 @@ examin-ai/
     │   │   │   ├── SecurityConfig.java           (filter chains, BCrypt bean, Spring Session, /login, role namespaces)
     │   │   │   ├── AsyncConfig.java              (@EnableAsync, executor: core=15, max=30, queue=150, awaitTermination=120s)
     │   │   │   ├── WebMvcConfig.java             (WebJar resource handlers, static asset mappings)
-    │   │   │   └── AIConfig.java                 (ChatClient bean, OllamaChatModel, 120s timeout)
+    │   │   │   └── AIConfig.java                 (`OllamaApi` RestClient; configurable read timeout, default 15m)
     │   │   │
     │   │   ├── user/
     │   │   │   ├── UserAccount.java              (@Entity — id, username, password, email, role, active, dateCreated)
@@ -624,7 +624,7 @@ examin-ai/
     │   │   │   ├── MentorReviewController.java       (GET /mentor/reviews, GET/POST /mentor/reviews/{id}/approve|reject)
     │   │   │   ├── ReviewPipelineService.java        (@Transactional submit; @Async runPipeline)
     │   │   │   ├── ReviewPersistenceService.java     (save TaskReview + issues atomically; publish events)
-    │   │   │   ├── LLMReviewService.java             (ChatClient call, think-strip regex, BeanOutputConverter)
+    │   │   │   ├── LLMReviewService.java             (ChatModel call, LlmOutputSanitizer, BeanOutputConverter)
     │   │   │   ├── GitHubClient.java                 (@HttpExchange interface — getPrDiff)
     │   │   │   └── GitHubClientConfig.java           (RestClient bean + HttpServiceProxyFactory)
     │   │   │
@@ -691,7 +691,7 @@ examin-ai/
     └── test/
         └── java/com/examinai/
             ├── review/
-            │   ├── LLMReviewServiceTest.java         (unit: think-strip regex, BeanOutputConverter parsing)
+            │   ├── LLMReviewServiceTest.java         (unit: sanitizer + BeanOutputConverter parsing)
             │   ├── ReviewPipelineServiceTest.java     (unit: mock GitHubClient + ChatClient, PENDING-first rule)
             │   └── ReviewSubmissionControllerTest.java(@WebMvcTest: 202 response, CSRF, role access)
             ├── user/
@@ -720,7 +720,7 @@ examin-ai/
 |---|---|---|
 | `ReviewPipelineService` | State transitions; async orchestration | Directly send email or render views |
 | `ReviewPersistenceService` | DB writes for TaskReview + issues; event publishing | Call GitHub or LLM |
-| `LLMReviewService` | ChatClient calls; think-strip; BeanOutputConverter | Persist anything to DB |
+| `LLMReviewService` | ChatModel calls; LlmOutputSanitizer; BeanOutputConverter | Persist anything to DB |
 | `GitHubClient` | GitHub API calls | Know about reviews or LLM |
 | `NotificationService` | Email delivery; event listeners | Block on SMTP; call any repository |
 
@@ -755,7 +755,7 @@ NotificationService
 | System | Client | Auth | Failure Handling |
 |---|---|---|---|
 | GitHub REST API | `GitHubClient` (@HttpExchange + RestClient) | `Authorization: Bearer {GITHUB_TOKEN}` | 404/403/429 → ERROR state |
-| Ollama | Spring AI `ChatClient` | None (internal Docker network) | Timeout 120s → ERROR state |
+| Ollama | Spring AI `OllamaChatModel` / `OllamaApi` | None (internal Docker network) | HTTP read timeout exceeded → ERROR state |
 | SMTP | `JavaMailSender` | `MAIL_USERNAME` / `MAIL_PASSWORD` from env | Log + continue (never blocks pipeline) |
 
 **Data Flow — Happy Path:**
@@ -830,7 +830,7 @@ Project structure directly reflects the package-by-feature decision. Template di
 |---|---|---|
 | Submit < 500ms | ✅ | 202 Accepted before any external call |
 | Poll < 200ms | ✅ | DB read-only `ReviewStatusController` |
-| AI pipeline < 90s | ✅ | Dedicated @Async thread pool, 120s LLM timeout |
+| AI pipeline completes within Ollama timeout | ✅ | Dedicated @Async thread pool; configurable Ollama read timeout (default 15m) |
 | BCrypt ≥ 12 | ✅ | `BCryptPasswordEncoder(12)` in `SecurityConfig` |
 | Server-side auth | ✅ | `@PreAuthorize` on every controller method |
 | No secret in code | ✅ | `.env` + Docker Compose env injection only |
@@ -874,7 +874,7 @@ error_message VARCHAR(500)   -- populated on ERROR status, null otherwise
 **✅ Requirements Analysis**
 - [x] Project context thoroughly analyzed (33 FRs, 7 categories)
 - [x] Scale and complexity assessed (Medium — no regulatory compliance)
-- [x] Technical constraints identified (Spring AI BOM, think-token stripping, async pipeline)
+- [x] Technical constraints identified (Spring AI BOM, LLM output sanitization, async pipeline)
 - [x] Cross-cutting concerns mapped (6 concerns documented)
 
 **✅ Architectural Decisions**
@@ -907,7 +907,7 @@ error_message VARCHAR(500)   -- populated on ERROR status, null otherwise
 - Write-first pipeline makes zero submission loss architecturally guaranteed
 - Spring Session JDBC gives session persistence with zero extra infrastructure
 - `@TransactionalEventListener(AFTER_COMMIT)` makes email a true fire-and-forget — SMTP outages cannot roll back reviews
-- Think-token stripping + BeanOutputConverter is specified precisely enough that any agent will implement it identically
+- `LlmOutputSanitizer` + BeanOutputConverter is specified precisely enough that any agent will implement it identically
 - PRG rule eliminates an entire class of duplicate submission bugs
 
 **Areas for Future Enhancement (Post-MVP):**

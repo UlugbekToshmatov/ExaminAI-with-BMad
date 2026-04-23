@@ -156,7 +156,7 @@ so that I receive structured code feedback without waiting for a mentor to read 
 ### Latest technical specifics
 
 - **Spring AI 1.0.0** (BOM) + **Ollama** starter already in project; use `BeanOutputConverter` for structured output.  
-- **deepseek-r1** may emit `<think>` blocks — mandatory strip before JSON parse. [Source: architecture.md + PRD NFR]  
+- **LLM output normalization** — reasoning-model tags, markdown JSON fences, or prose around JSON are handled by `LlmOutputSanitizer` before `BeanOutputConverter` parse. [Source: architecture.md + PRD NFR]  
 - **GitHub API:** Personal access token via `Authorization: Bearer` header only.
 
 ### Project context reference

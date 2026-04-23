@@ -5,7 +5,7 @@ workflowType: 'research'
 lastStep: 1
 research_type: 'technical'
 research_topic: 'AI-Powered Mentorship Platform (ExaminAI)'
-research_goals: 'Validate technical feasibility and compatibility of the proposed stack: Spring Boot, Spring AI, deepseek-r1:8b (Ollama), GitHub API, PostgreSQL, Liquibase, Thymeleaf, Docker'
+research_goals: 'Validate technical feasibility and compatibility of the proposed stack: Spring Boot, Spring AI, qwen2.5-coder:3b (Ollama), GitHub API, PostgreSQL, Liquibase, Thymeleaf, Docker'
 user_name: 'Ulugbek'
 date: '2026-04-19'
 web_research_enabled: true
@@ -24,14 +24,14 @@ source_verification: true
 
 This report validates the technical stack proposed for **ExaminAI** — an AI-powered code mentorship platform where mentors review interns' code assisted by a local LLM. Research was conducted across five stages using live web sources: technology stack analysis, integration patterns, architectural patterns, and implementation best practices. All dependency versions were verified for mutual compatibility.
 
-**Critical findings:** Spring Boot must be upgraded from 3.2.x to **3.4.2+** (required by Spring AI 1.0.x); the review flow must be **asynchronous** (LLM takes 10–60s); the `Task.dateDone` data model has a multi-intern flaw; the `User` entity was missing from the schema; and deepseek-r1:8b requires `<think>` token stripping before JSON parsing. All issues have been corrected in `docs/requirements.md`. See the **Research Synthesis** section for the full executive summary and strategic recommendations.
+**Critical findings:** Spring Boot must be upgraded from 3.2.x to **3.4.2+** (required by Spring AI 1.0.x); the review flow must be **asynchronous** (LLM duration varies by hardware and diff size); the `Task.dateDone` data model has a multi-intern flaw; the `User` entity was missing from the schema; and LLM responses must be normalized (`LlmOutputSanitizer`: reasoning tags, markdown fences, prose around JSON) before `BeanOutputConverter` parsing. All issues have been corrected in `docs/requirements.md`. See the **Research Synthesis** section for the full executive summary and strategic recommendations.
 
 ---
 
 ## Technical Research Scope Confirmation
 
 **Research Topic:** AI-Powered Mentorship Platform (ExaminAI)
-**Research Goals:** Validate technical feasibility and compatibility of the proposed stack: Spring Boot, Spring AI, deepseek-r1:8b (Ollama), GitHub API, PostgreSQL, Liquibase, Thymeleaf, Docker
+**Research Goals:** Validate technical feasibility and compatibility of the proposed stack: Spring Boot, Spring AI, qwen2.5-coder:3b (Ollama), GitHub API, PostgreSQL, Liquibase, Thymeleaf, Docker
 
 **Technical Research Scope:**
 
@@ -77,21 +77,21 @@ Java is the primary language for this platform via Spring Boot 3.x.
 
 _Source: [Spring AI Upgrade Notes](https://docs.spring.io/spring-ai/reference/upgrade-notes.html)_
 
-### AI / LLM: deepseek-r1:8b via Ollama
+### AI / LLM: qwen2.5-coder:3b via Ollama
 
 **Capabilities for code review:**
-- Strong reasoning and code analysis (math/logic/programming benchmarks)
-- JSON structured output supported (from DeepSeek-R1-0528 update)
-- Suitable for APPROVED/REJECTED verdict + issue extraction
+- Code-oriented 3B instruct model; strong fit for “JSON-only” PR review prompts
+- Smaller weights → **much faster on CPU** than 8B reasoning models (e.g. former `deepseek-r1:8b` baseline)
+- Suitable for structured verdict + per-line issues when the prompt enforces JSON
 
 **Hardware requirements:**
-- Minimum: 8 GB GPU VRAM (functional); 12–16 GB recommended
-- CPU-only operation: significantly slower, not recommended for interactive use
-- 4-bit quantized variant reduces to ~4–6 GB VRAM
+- **CPU-only:** viable for MVP (latency scales with diff size; configure a generous Ollama HTTP read timeout)
+- **GPU:** optional speedup; 3B quantized typically needs far less VRAM than 8B reasoning models
+- **RAM:** full Compose stack (app + postgres + ollama) still benefits from **16 GB+** host RAM
 
-**⚠️ Risk:** The 8B model has moderate coding benchmark scores (39.6% LiveCodeBench). For a learning environment this is acceptable, but larger models (e.g., deepseek-coder:6.7b or codellama:13b) would produce higher-quality reviews.
+**⚠️ Risk:** A 3B model trades quality vs. larger coders (e.g. `qwen2.5-coder:7b`, `deepseek-coder:6.7b`, `codellama:13b`). Mentors retain final authority; poor AI output must not block workflow.
 
-_Sources: [DeepSeek-R1 on Ollama](https://ollama.com/library/deepseek-r1:8b) | [Hardware Guide](https://www.rnfinity.com/news/Hardware-requirements-for-running-large-language-model-Deepseek-R1-on-a-local-machine)_
+_Sources: [Qwen2.5 Coder on Ollama](https://ollama.com/library/qwen2.5-coder) | [Ollama docs](https://github.com/ollama/ollama)_
 
 ### Database and Storage Technologies
 
@@ -126,7 +126,7 @@ _Source: [GitHub REST API - Pull Requests](https://docs.github.com/en/rest/pulls
 - Use service name `db` (not `localhost`) in JDBC URL: `jdbc:postgresql://db:5432/examinai`
 - Use `http://ollama:11434` for Spring AI Ollama base URL
 - `depends_on` only waits for container start — add health checks for DB readiness
-- Ollama model (deepseek-r1:8b ~4.7 GB) must be pre-pulled or downloaded at first startup
+- Ollama model (`qwen2.5-coder:3b`, ~2 GB) must be pre-pulled or downloaded at first startup
 - All three services running simultaneously require 16–20 GB RAM minimum on the host
 
 _Sources: [Baeldung: Spring Boot + PostgreSQL Docker](https://www.baeldung.com/spring-boot-postgresql-docker) | [Ollama Docker Compose](https://medium.com/@prasanta.mohanty/deploying-ollama-with-docker-compose-a-simple-guide-to-local-llms-610db2991581)_
@@ -172,10 +172,10 @@ _Source: [REST Clients :: Spring Framework](https://docs.spring.io/spring-framew
 
 - Use `BeanOutputConverter<T>` — generates JSON Schema from a Java record/class and deserializes the response automatically
 - For Ollama 0.5+: use `OllamaChatOptions.builder().outputSchema(jsonSchema)` for native schema enforcement
-- **Critical:** Include `"json"` keyword in the prompt AND set `response_format: {type: "json_object"}` when using deepseek models
+- **Critical:** Keep the prompt strict (“JSON only”); use `BeanOutputConverter` + post-processing for robustness
 - Strip any markdown code fences (` ```json ``` `) from responses before parsing
 
-**⚠️ Risk with deepseek-r1:8b:** The model's `<think>` reasoning tokens appear before the JSON output. Spring AI's `BeanOutputConverter` may fail to parse if the response includes the thinking prefix. A response post-processor to strip `<think>...</think>` blocks is needed.
+**⚠️ Risk with chat models:** Output may include markdown fences or extra prose around JSON. Implement `LlmOutputSanitizer` (and JSON object extraction fallback) before `BeanOutputConverter`.
 
 _Source: [Spring AI Structured Output](https://docs.spring.io/spring-ai/reference/api/structured-output-converter.html) | [Baeldung: Structured Output in Spring AI](https://www.baeldung.com/spring-artificial-intelligence-structure-output)_
 
@@ -194,7 +194,7 @@ spring:
       base-url: http://ollama:11434   # Docker service name
       chat:
         options:
-          model: deepseek-r1:8b
+          model: qwen2.5-coder:3b
 ```
 
 _Source: [Spring AI Prompts Reference](https://docs.spring.io/spring-ai/reference/api/prompt.html)_
@@ -270,7 +270,7 @@ _Source: [Package by Feature for Spring Projects](https://dzone.com/articles/pac
 3. `ReviewPersistenceService` — saves `TaskReview` + `TaskReviewIssue` atomically
 4. `NotificationService` — fires async events post-commit
 
-**⚠️ deepseek-r1 `<think>` token issue:** The model emits `<think>...</think>` reasoning tokens before the JSON output. `BeanOutputConverter` will fail to parse the response without a pre-processing step to strip those tokens. This must be implemented in `LLMReviewService`.
+**⚠️ LLM output normalization:** `BeanOutputConverter` expects clean JSON. Implement `LlmOutputSanitizer` in `LLMReviewService` before parsing (handles reasoning tags, fences, and embedded JSON).
 
 _Source: [Service Layer Pattern in Java With Spring Boot](https://foojay.io/today/service-layer-pattern-in-java-with-spring-boot/)_
 
@@ -357,9 +357,9 @@ services:
 ```
 
 **Key operational requirements (missing from spec):**
-- Ollama model must be pre-pulled (`ollama pull deepseek-r1:8b`) — 4.7 GB download
-- Host needs 16–20 GB RAM for all three containers simultaneously
-- GPU NVIDIA Container Toolkit required for hardware-accelerated inference
+- Ollama model must be pre-pulled (`ollama pull qwen2.5-coder:3b`) — ~2 GB download (quantized; verify locally)
+- Host needs 16–20 GB RAM for all three containers comfortably (less may work for light dev)
+- GPU optional; CPU-only acceptable for 3B with longer generation times
 
 _Source: [Baeldung: Spring Boot + PostgreSQL Docker](https://www.baeldung.com/spring-boot-postgresql-docker)_
 
@@ -414,7 +414,7 @@ spring:
   ai:
     ollama:
       base-url: http://localhost:11434
-      chat.options.model: deepseek-r1:8b
+      chat.options.model: qwen2.5-coder:3b
 
 examinai:
   github.token: ${GITHUB_TOKEN}
@@ -482,7 +482,7 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
       interval: 30s
       start_period: 60s     # Model download takes time
-    entrypoint: /bin/sh -c "ollama serve & sleep 5 && ollama pull deepseek-r1:8b && wait"
+    entrypoint: /bin/sh -c "ollama serve & sleep 5 && ollama pull qwen2.5-coder:3b && wait"
 
   app:
     depends_on:
@@ -509,8 +509,8 @@ Spring AI is the highest-risk knowledge gap — the API changed significantly be
 
 | Resource | Requirement | Mitigation |
 |---|---|---|
-| RAM | 16–20 GB total | Use 4-bit quantized deepseek-r1:8b (~4 GB VRAM) |
-| GPU | 8 GB VRAM min | CPU-only fallback: 3–5x slower but functional |
+| RAM | 16–20 GB total | Comfortable for app + postgres + ollama concurrently |
+| GPU | Optional | Speeds up inference; 3B runs on CPU for MVP |
 | Disk | ~10 GB for Ollama volume | Named Docker volume, not bind mount |
 | GitHub API | 5,000 req/hour | Cache PR diff per `(repoOwner, repoName, prNumber)` for 10 min |
 
@@ -519,8 +519,8 @@ Spring AI is the highest-risk knowledge gap — the API changed significantly be
 | Risk | Severity | Mitigation |
 |---|---|---|
 | Spring AI 1.0.x breaking changes from 0.x | High | Pin BOM version; read upgrade notes before updating |
-| deepseek-r1 `<think>` tokens breaking JSON parse | High | Strip `<think>.*</think>` with regex before `BeanOutputConverter` |
-| LLM timeout under CPU-only inference | High | Set `spring.ai.ollama.chat.options.num-predict` limit; 120s timeout |
+| LLM returns non-JSON wrappers (fences / prose / reasoning tags) | High | `LlmOutputSanitizer` + JSON object extraction before `BeanOutputConverter` |
+| LLM timeout under CPU-only inference | High | Increase `examinai.ai.ollama-read-timeout-ms`; optional `num-predict` cap |
 | Ollama container OOM kill | Medium | Set Docker memory limit; use quantized model |
 | GitHub API rate limit | Low | Cache PR data; use fine-grained PAT |
 | Liquibase migration failure on startup | Medium | Test changelogs with `liquibase validate` before deploy |
@@ -531,7 +531,7 @@ Spring AI is the highest-risk knowledge gap — the API changed significantly be
 
 1. **Week 1:** Scaffold Spring Boot 3.4.2 project; configure PostgreSQL + Liquibase; implement UserAccount + Security
 2. **Week 2:** GitHub API integration (RestClient + PAT); Task/Course CRUD; Thymeleaf views for Intern/Mentor/Admin
-3. **Week 3:** Spring AI + Ollama integration; prompt templates; BeanOutputConverter + `<think>` stripping
+3. **Week 3:** Spring AI + Ollama integration; prompt templates; `BeanOutputConverter` + `LlmOutputSanitizer`
 4. **Week 4:** Async review pipeline (submit + poll); notifications; Docker Compose with healthchecks
 5. **Week 5:** Seed data, testing, bug fixes, final Docker validation
 
@@ -539,11 +539,11 @@ Spring AI is the highest-risk knowledge gap — the API changed significantly be
 
 **Validated, use as-is:** Spring Boot 3.4.2, Spring AI 1.0.0 (BOM), PostgreSQL 16, Liquibase 4.31.1, Thymeleaf 3.1.x, Spring Security 6.x, Docker Compose 3.8
 
-**Needs extra care:** deepseek-r1:8b response parsing (think-token stripping), Spring Boot 3.4.x migration from 3.2.x, Ollama model pre-loading in Docker
+**Needs extra care:** `LlmOutputSanitizer` + parse fallbacks, Spring Boot 3.4.x migration from 3.2.x, Ollama model pre-loading in Docker
 
 ### Success Metrics and KPIs
 
-- Review pipeline end-to-end latency: < 90 seconds (submit → mentor notification)
+- AI stage latency: within configured Ollama HTTP read timeout (default 15m); typically much faster with `qwen2.5-coder:3b` on CPU for modest diffs
 - LLM JSON parse success rate: > 95% (monitor parse exceptions)
 - GitHub API error rate: < 1% (monitor 403/429 responses)
 - Application startup time with Liquibase + Ollama health: < 45 seconds
@@ -554,16 +554,16 @@ Spring AI is the highest-risk knowledge gap — the API changed significantly be
 
 ## Executive Summary
 
-ExaminAI is a Spring Boot monolith that allows mentors to review interns' code with AI assistance from a locally-hosted LLM (deepseek-r1:8b via Ollama). The platform integrates GitHub pull request data, role-based access control (Intern / Mentor / Admin), and a structured AI review pipeline that produces per-line code feedback with an APPROVED/REJECTED verdict.
+ExaminAI is a Spring Boot monolith that allows mentors to review interns' code with AI assistance from a locally-hosted LLM (qwen2.5-coder:3b via Ollama). The platform integrates GitHub pull request data, role-based access control (Intern / Mentor / Admin), and a structured AI review pipeline that produces per-line code feedback with an APPROVED/REJECTED verdict.
 
 Research across five technical dimensions confirms the stack is **architecturally sound and technically feasible**. All proposed technologies are production-ready and well-supported as of 2026. However, nine issues were identified — several of them blockers that would have caused runtime failures. These have all been corrected in `docs/requirements.md` before implementation begins.
 
-The highest-impact finding is a **version incompatibility**: Spring AI 1.0.x requires Spring Boot 3.4.2+, not 3.2.x as originally specified. The second-highest is the **async pipeline gap**: LLM inference takes 10–60 seconds per call, which would have caused HTTP timeouts under the synchronous 13-step flow in the original requirements. Both are now fixed.
+The highest-impact finding is a **version incompatibility**: Spring AI 1.0.x requires Spring Boot 3.4.2+, not 3.2.x as originally specified. The second-highest is the **async pipeline gap**: LLM inference duration varies by model and hardware and must not block the HTTP submit thread — the synchronous 13-step flow in the original requirements would have caused timeouts. Both are now fixed.
 
 **Key Technical Findings:**
 
 - Spring Boot must be **3.4.2+** (Spring AI 1.0.x dependency requirement — verified against Spring AI release notes)
-- deepseek-r1:8b emits `<think>...</think>` reasoning tokens that break `BeanOutputConverter` JSON parsing — a post-processor is required
+- LLM chat responses may include markdown fences or prose around JSON — `LlmOutputSanitizer` + extraction fallback is required before `BeanOutputConverter`
 - The `Task.dateDone` boolean is structurally broken for multi-intern courses — completion tracking moved to `TaskReview.status`
 - The `UserAccount` table was absent from the schema despite being referenced as a FK in every other table
 - Docker Compose `depends_on` without healthchecks causes Spring Boot to start before PostgreSQL is ready, causing connection failures
@@ -575,7 +575,7 @@ The highest-impact finding is a **version incompatibility**: Spring AI 1.0.x req
 **Technical Recommendations:**
 
 1. Use Spring Boot **3.4.2** as the baseline — do not use 3.2.x
-2. Implement a `<think>` token stripper in `LLMReviewService` before calling `BeanOutputConverter`
+2. Implement `LlmOutputSanitizer` in `LLMReviewService` before calling `BeanOutputConverter`
 3. Design the review submission as async from day one — build the poll endpoint alongside the submit endpoint
 4. Add Docker Compose healthchecks (`pg_isready`) and `condition: service_healthy` on app startup
 5. Pre-pull the Ollama model in the Docker entrypoint script to avoid cold-start failures
@@ -637,7 +637,7 @@ Spring AI reached GA (1.0) in May 2025, making 2026 the first year this stack ca
 | Thymeleaf | 3.1.x (bundled) | + `thymeleaf-extras-springsecurity6:3.1.2` |
 | PostgreSQL | 16 (Docker) | JDBC driver 42.7.3 via Boot parent |
 | Liquibase | **4.31.1+** | Avoid pre-4.17 (Spring Boot 3.x regression) |
-| Ollama | latest | `deepseek-r1:8b` (~4.7 GB) |
+| Ollama | latest | `qwen2.5-coder:3b` (~2 GB) |
 | Docker Compose | 3.8 | Healthcheck + named volumes |
 
 _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference/getting-started.html) | [Spring AI Releases](https://github.com/spring-projects/spring-ai/releases)_
@@ -649,7 +649,7 @@ _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference
 | Integration | Pattern | Key Detail |
 |---|---|---|
 | App → GitHub | `RestClient` + `@HttpExchange` | Bearer PAT from `GITHUB_TOKEN` env var |
-| App → Ollama | Spring AI `ChatClient` | `BeanOutputConverter<T>` for JSON; strip `<think>` first |
+| App → Ollama | Spring AI `OllamaChatModel` | `LlmOutputSanitizer` then `BeanOutputConverter<T>` for JSON |
 | App → PostgreSQL | JPA/Hibernate + HikariCP | Pool: 10 max; `hikari.connection-timeout=20000` |
 | App → Email | `JavaMailSender` @Async | SMTP config from env; `@TransactionalEventListener` |
 | Browser → App | HTTP + Thymeleaf SSR | Polling `/reviews/{id}/status` for async results |
@@ -666,7 +666,7 @@ _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference
     ↓ (background thread pool: core=15, max=30)
 [GitHub API fetch] → [Prompt assembly] → [Ollama LLM call]
     ↓
-[Strip <think> tokens] → [BeanOutputConverter] → [DB save]
+[LlmOutputSanitizer] → [BeanOutputConverter] → [DB save]
     ↓
 [ApplicationEventPublisher] → [@Async email to mentor]
     ↓ (mentor acts)
@@ -698,7 +698,7 @@ _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference
 - `queueCapacity: 150` — backpressure buffer
 - `awaitTerminationSeconds: 120` — graceful shutdown
 
-**Hardware minimum for full Docker stack:** 16–20 GB RAM, 8 GB GPU VRAM (or 4-bit quantized model ~4 GB).
+**Hardware minimum for full Docker stack:** 16–20 GB RAM recommended; GPU optional for faster inference.
 
 ---
 
@@ -706,7 +706,7 @@ _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference
 
 ### Must-Do Before Implementation Starts
 1. ✅ Upgrade Spring Boot target to 3.4.2+ in `pom.xml`
-2. ✅ Add `<think>` token stripping to LLM response handling spec
+2. ✅ Add `LlmOutputSanitizer` / JSON extraction to LLM response handling spec
 3. ✅ Implement async review flow (202 + poll) — not synchronous
 4. ✅ Add `UserAccount` table to Liquibase changelogs
 5. ✅ Add Docker healthchecks to Compose spec
@@ -720,7 +720,7 @@ _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference
 ### Nice-to-Have
 10. Add `/actuator/health` Spring Boot Actuator for Docker healthcheck
 11. Add `review_audit_log` table for state transition history
-12. Consider replacing deepseek-r1:8b with `deepseek-coder:6.7b` for stronger code-specific reviews
+12. Consider larger coder models (e.g. `qwen2.5-coder:7b`, `deepseek-coder:6.7b`) for stronger reviews if latency/hardware allow
 
 ---
 
@@ -730,7 +730,7 @@ _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference
 |---|---|---|
 | 1 | Foundation | Spring Boot 3.4.2 scaffold, PostgreSQL + Liquibase, UserAccount + Security (all 3 roles) |
 | 2 | Features | GitHub API client, Task/Course CRUD, Thymeleaf views per role |
-| 3 | AI Pipeline | Spring AI + Ollama, prompt templates, `<think>` stripper, BeanOutputConverter |
+| 3 | AI Pipeline | Spring AI + Ollama, prompt templates, `LlmOutputSanitizer`, BeanOutputConverter |
 | 4 | Async + Notify | @Async thread pool, 202 submit + poll, JavaMailSender notifications |
 | 5 | Hardening | Seed data, tests, Docker Compose with healthchecks, `.env` validation |
 
@@ -741,7 +741,7 @@ _Sources: [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference
 All facts in this document were verified against live sources in April 2026:
 - [Spring AI Reference Docs](https://docs.spring.io/spring-ai/reference/)
 - [Spring AI Upgrade Notes](https://docs.spring.io/spring-ai/reference/upgrade-notes.html)
-- [Ollama deepseek-r1:8b](https://ollama.com/library/deepseek-r1:8b)
+- [Ollama library: qwen2.5-coder](https://ollama.com/library/qwen2.5-coder)
 - [GitHub REST API](https://docs.github.com/en/rest/pulls/pulls)
 - [Liquibase Spring Boot Integration](https://contribute.liquibase.com/extensions-integrations/directory/integration-docs/springboot/)
 - [Baeldung: Spring Boot + PostgreSQL Docker](https://www.baeldung.com/spring-boot-postgresql-docker)

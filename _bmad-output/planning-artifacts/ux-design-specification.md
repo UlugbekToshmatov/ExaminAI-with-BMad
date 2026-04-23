@@ -19,7 +19,7 @@ inputDocuments:
 
 ### Project Vision
 
-ExaminAI is a web-based code review platform that eliminates the mentor bottleneck in intern training programs. Interns submit GitHub pull requests for assigned tasks; a locally-hosted AI (deepseek-r1:8b via Ollama) produces structured, line-level feedback within 90 seconds; mentors review the AI draft and make the final approve/reject decision. The AI never replaces mentor judgment — it replaces their reading time. Human accountability is preserved; the bottleneck is eliminated.
+ExaminAI is a web-based code review platform that eliminates the mentor bottleneck in intern training programs. Interns submit GitHub pull requests for assigned tasks; a locally-hosted AI (`qwen2.5-coder:3b` via Ollama) produces structured, line-level feedback asynchronously—typically minutes on CPU for modest diffs (bounded by a configurable Ollama HTTP timeout); mentors review the AI draft and make the final approve/reject decision. The AI never replaces mentor judgment — it replaces their reading time. Human accountability is preserved; the bottleneck is eliminated.
 
 The platform runs as a server-side MPA (Spring MVC + Thymeleaf) with three role-based view sets (Intern, Mentor, Admin). The async review pipeline (submit → 202 Accepted → 3-second polling → terminal state) is the central UX challenge and the defining interaction of the product.
 
@@ -33,7 +33,7 @@ The platform runs as a server-side MPA (Spring MVC + Thymeleaf) with three role-
 
 ### Key Design Challenges
 
-1. **Async UX in a synchronous-feeling product** — LLM inference takes 10–60 seconds. The polling loop with clear status labels (`Submitted → AI Reviewing → Awaiting Mentor → Approved / Rejected`) carries the entire perceived experience. A spinner with no state context will destroy intern confidence.
+1. **Async UX in a synchronous-feeling product** — LLM inference duration depends on hardware and diff size (often minutes on CPU; bounded by a configurable Ollama timeout). The polling loop with clear status labels (`Submitted → AI Reviewing → Awaiting Mentor → Approved / Rejected`) carries the entire perceived experience. A spinner with no state context will destroy intern confidence.
 
 2. **Mentor review in ≤ 2 minutes** — The AI feedback display must be scannable: flagged issues grouped with code context, verdict suggestion prominent, approve/reject one click away. Every extra scroll or click risks pushing the review past the 2-minute target.
 

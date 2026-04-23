@@ -8,8 +8,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * Ollama HTTP client timeouts for {@code /api/chat}. CPU-bound inference (e.g. DeepSeek R1 8B) with
- * large PR diffs often exceeds 2 minutes; the read timeout must cover full generation or the client
+ * Ollama HTTP client timeouts for {@code /api/chat}. CPU-bound inference with large PR diffs can take
+ * many minutes; the read timeout must cover full generation or the client
  * aborts and Ollama logs HTTP 500 after the same duration.
  */
 @Configuration

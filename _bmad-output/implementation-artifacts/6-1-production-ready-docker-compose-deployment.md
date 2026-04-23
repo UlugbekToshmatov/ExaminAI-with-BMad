@@ -29,7 +29,7 @@ so that anyone can run the full stack locally or in production without manual co
    **When** the file is inspected  
    **Then** it uses image `ollama/ollama`, mounts `ollama-models` at `/root/.ollama`, healthcheck: `curl -f http://localhost:11434/api/tags`  
    **And** entrypoint is  
-   ` /bin/sh -c "ollama serve & sleep 5 && ollama pull deepseek-r1:8b && wait"` — pre-pulling the model on first start.
+   ` /bin/sh -c "ollama serve & sleep 5 && ollama pull qwen2.5-coder:3b && wait"` — pre-pulling the model on first start.
 
 4. **App service**  
    **Given** the `app` service in `docker-compose.yml`  
@@ -55,7 +55,7 @@ so that anyone can run the full stack locally or in production without manual co
    **Then** existing `TaskReview`, `Course`, `Task`, and `UserAccount` data remains — no data loss on container restart.
 
 8. **Ollama model volume**  
-   **Given** Ollama restarts after `deepseek-r1:8b` was already pulled  
+   **Given** Ollama restarts after `qwen2.5-coder:3b` was already pulled  
    **When** the container starts  
    **Then** the model is available from `ollama-models` — no full re-download.
 
@@ -119,7 +119,7 @@ so that anyone can run the full stack locally or in production without manual co
 | Build | `mvn package -DskipTests` in Docker build — align with existing `examin-ai` artifact name in `pom.xml`. |
 | Config | All sensitive values via `.env` — [`.env` is gitignored](../../.gitignore). |
 | Actuator | [`application.yml`](../../src/main/resources/application.yml) — `management.endpoints.web.exposure.include: health` only. |
-| Ollama client | [`AIConfig`](../../src/main/java/com/examinai/config/AIConfig.java) 120s read timeout — not changed by Compose work unless env breaks connectivity. |
+| Ollama client | [`AIConfig`](../../src/main/java/com/examinai/config/AIConfig.java) configurable read timeout (default 15m) — not changed by Compose work unless env breaks connectivity. |
 
 ### Architecture compliance
 
@@ -145,7 +145,7 @@ so that anyone can run the full stack locally or in production without manual co
 
 - **Prove:** one-command `docker compose up --build` from repo root with a filled `.env` (all keys from `.env.example`) brings up the stack; app responds on port 8080; `/actuator/health` returns UP.
 - **Prove:** `docker compose down` and `up` again — Postgres data and Ollama model data persist (named volumes, not `down -v`).
-- **Note:** first Ollama start can take a long time while pulling `deepseek-r1:8b`; `depends_on: service_healthy` should prevent the app from starting before Ollama healthcheck passes. Compose gives Ollama a long `start_period` (1200s) and extra `retries` for slow networks; if health still flaps, check bandwidth or pull the model on a faster link once.
+- **Note:** first Ollama start can take a long time while pulling `qwen2.5-coder:3b`; `depends_on: service_healthy` should prevent the app from starting before Ollama healthcheck passes. Compose gives Ollama a long `start_period` (1200s) and extra `retries` for slow networks; if health still flaps, check bandwidth or pull the model on a faster link once.
 
 ### Project structure notes
 
@@ -185,7 +185,7 @@ _N/A_
 ### Completion Notes List
 
 - **Done:** Root `Dockerfile`, `Dockerfile.ollama`, `docker-compose.yml`, `.dockerignore`, `.env.example` comments. `mvn -q -DskipTests package` and full `mvn -q test` pass on implementer’s machine.  
-- **Docker E2E:** Full `docker compose up --build` not executed here (Docker Engine unavailable in this environment). On a host with Docker: copy `.env` from `.env.example`, set `DB_URL=jdbc:postgresql://postgres:5432/examinai`, set DB and mail creds, set `OLLAMA_BASE_URL=http://ollama:11434` (or omit that line so `application.yml` default applies — avoid a blank `OLLAMA_BASE_URL` key if Spring binds empty string). First Ollama start can take a long time while `deepseek-r1:8b` pulls.  
+- **Docker E2E:** Full `docker compose up --build` not executed here (Docker Engine unavailable in this environment). On a host with Docker: copy `.env` from `.env.example`, set `DB_URL=jdbc:postgresql://postgres:5432/examinai`, set DB and mail creds, set `OLLAMA_BASE_URL=http://ollama:11434` (or omit that line so `application.yml` default applies — avoid a blank `OLLAMA_BASE_URL` key if Spring binds empty string). First Ollama start can take a long time while `qwen2.5-coder:3b` pulls.  
 - **AC9 manual:** To confirm async drain under Docker, run `docker compose stop app` (or `stop` full stack) while a review is in progress and check logs for orderly shutdown; config remains 120s await.  
 - **AC7–8 manual:** After data exists, `docker compose down` (no `-v`) then `up` again — `db-data` and `ollama-models` must persist (named volumes in compose file).
 

@@ -24,7 +24,7 @@ services:
       retries: 12
       start_period: 30s
 
-  # Ollama: first `docker compose up` can take a long time while `deepseek-r1:8b` downloads.
+  # Ollama: first `docker compose up` pulls `qwen2.5-coder:3b` (default review model; smaller/faster on CPU than 8B reasoning models).
   # Health `start_period` / `retries` are relaxed for slow links; entrypoint is unchanged (code review D1, option 1).
   ollama:
     build:
@@ -32,7 +32,7 @@ services:
       dockerfile: Dockerfile.ollama
     image: examinai-ollama:local
     pull_policy: never
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull deepseek-r1:8b && wait"]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull qwen2.5-coder:3b && wait"]
     volumes:
       - ollama-models:/root/.ollama
     healthcheck:

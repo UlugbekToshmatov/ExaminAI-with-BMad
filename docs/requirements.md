@@ -43,7 +43,7 @@ The review is processed **asynchronously** because LLM inference takes 10–60 s
 5. The task description is retrieved from the database.
 6. A system prompt is assembled from the configured prompt template.
 7. PR data + task description are sent to the LLM.
-8. The LLM returns a JSON response. **Note:** deepseek-r1 models prepend `<think>...</think>` reasoning tokens before the JSON — these must be stripped before parsing.
+8. The LLM returns a JSON response. **Note:** Some models may prepend reasoning tags (e.g. `<think>...</think>`), markdown fences, or prose around JSON — `LlmOutputSanitizer` normalizes output before parsing.
 9. The response is parsed and saved to the database (`TaskReview` status → `LLM_EVALUATED`, + `TaskReviewIssue` rows).
 10. A notification is sent to the mentor.
 
@@ -141,14 +141,14 @@ URGENT: use only compatible versions for all dependencies
 - PostgreSQL 16 database (Docker image)
 - Liquibase **4.31.1+** for the DB versioning
 - Spring AI **1.0.0** (via BOM import) for communication with LLM
-- Local AI agent: Ollama with model `deepseek-r1:8b` (Docker image)
+- Local AI agent: Ollama with model `qwen2.5-coder:3b` (Docker image)
 - Prompt templates, system prompt messages, and related configuration must be defined in `.st` template files under `src/main/resources/prompts/` and referenced from `application.yml`
 - Generate `.env` file for all configuration variables (DB credentials, GitHub token, mail config, Ollama URL)
 - Application, database, and LLM must be deployed as separate Docker containers via **Docker Compose**
 - Docker Compose must include **health checks** for PostgreSQL (so the app waits for DB readiness before starting) and a named volume for Ollama model persistence
-- The `spring.ai.ollama.chat.options.model` property must be set to `deepseek-r1:8b`
+- The `spring.ai.ollama.chat.options.model` property must be set to `qwen2.5-coder:3b`
 - GitHub API calls must use a `GITHUB_TOKEN` env variable for authentication (`Authorization: Bearer {GITHUB_TOKEN}`)
-- LLM response post-processing: strip `<think>...</think>` blocks from deepseek-r1 responses before JSON parsing
+- LLM response post-processing: strip common reasoning tags / markdown fences and extract JSON as needed (`LlmOutputSanitizer` + `BeanOutputConverter`) before persisting issues
 - Async processing: LLM review calls must run in a dedicated `@Async` thread pool; submission endpoint returns `202 Accepted` with `reviewId` for polling
 
 ---

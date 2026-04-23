@@ -81,7 +81,7 @@ NFR15: SMTP email delivery failures are logged but do not block the review pipel
 NFR16: Every task submission persisted as a TaskReview row with status PENDING before any external API call — no submission lost due to downstream failure
 NFR17: Liquibase schema migration completes successfully before the application serves HTTP traffic
 NFR18: PostgreSQL data persists across container restarts via a named Docker volume
-NFR19: Ollama model data (deepseek-r1:8b) persists across container restarts via a named Docker volume
+NFR19: Ollama model data (qwen2.5-coder:3b) persists across container restarts via a named Docker volume
 NFR20: Async review thread pool configured with graceful shutdown: in-flight reviews complete before application exits (awaitTerminationSeconds: 120)
 
 **Total NFRs: 20**
@@ -320,7 +320,7 @@ None.
   1. The submission form (3 fields, PRG, 202 response)
   2. The write-first PENDING pipeline
   3. GitHub client invocation + diff fetch
-  4. LLM invocation + think-token stripping + BeanOutputConverter
+  4. LLM invocation + LlmOutputSanitizer + BeanOutputConverter
   5. Persisting structured feedback + `TaskReviewIssue` rows
   6. Publishing `AiReviewCompleteEvent`
   7. DB schema for `task_review_issue` table
