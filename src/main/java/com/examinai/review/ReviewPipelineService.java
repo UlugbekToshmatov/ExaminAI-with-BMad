@@ -22,10 +22,13 @@ public class ReviewPipelineService {
     private static final Logger log = LoggerFactory.getLogger(ReviewPipelineService.class);
 
     static final String MSG_GITHUB_404 = "GitHub PR not found. Check your PR number and resubmit.";
+    static final String MSG_GITHUB_401 = "GitHub rejected the token (401). Set a valid GITHUB_TOKEN in .env with repo scope.";
     static final String MSG_GITHUB_403 = "GitHub token has insufficient permissions.";
     static final String MSG_GITHUB_429 = "GitHub API rate limited. Wait a few minutes and resubmit.";
     static final String MSG_LLM_TIMEOUT = "AI review timed out. Try resubmitting.";
     static final String MSG_LLM_PARSE = "AI review failed. Try resubmitting.";
+    static final String MSG_LLM_UNREACHABLE =
+        "Cannot reach Ollama. From Docker, OLLAMA_BASE_URL must be http://ollama:11434 (set in docker-compose for the app service).";
 
     private final TaskReviewRepository taskReviewRepository;
     private final TaskRepository taskRepository;
@@ -100,6 +103,10 @@ public class ReviewPipelineService {
                 reviewPersistenceService.markPipelineError(reviewId, MSG_GITHUB_404);
                 return;
             }
+            if (code == 401) {
+                reviewPersistenceService.markPipelineError(reviewId, MSG_GITHUB_401);
+                return;
+            }
             if (code == 403) {
                 reviewPersistenceService.markPipelineError(reviewId, MSG_GITHUB_403);
                 return;
@@ -120,6 +127,10 @@ public class ReviewPipelineService {
                 reviewPersistenceService.markPipelineError(reviewId, MSG_LLM_TIMEOUT);
                 return;
             }
+            if (isLlmUnreachable(e)) {
+                reviewPersistenceService.markPipelineError(reviewId, MSG_LLM_UNREACHABLE);
+                return;
+            }
             if (isLlmParseFailure(e)) {
                 reviewPersistenceService.markPipelineError(reviewId, MSG_LLM_PARSE);
                 return;
@@ -138,6 +149,26 @@ public class ReviewPipelineService {
         if (e instanceof ResourceAccessException rae) {
             String m = rae.getMessage();
             return m != null && m.toLowerCase().contains("timed out");
+        }
+        return false;
+    }
+
+    private static boolean isLlmUnreachable(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.ConnectException) {
+                return true;
+            }
+        }
+        if (e instanceof ResourceAccessException rae) {
+            String m = rae.getMessage();
+            if (m == null) {
+                return false;
+            }
+            String lower = m.toLowerCase();
+            return lower.contains("connection refused")
+                || lower.contains("failed to connect")
+                || lower.contains("host is down")
+                || lower.contains("network is unreachable");
         }
         return false;
     }

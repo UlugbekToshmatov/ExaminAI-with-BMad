@@ -29,4 +29,16 @@ class LLMReviewServiceTest {
     void sanitizer_handlesPlainJson() {
         assertThat(LlmOutputSanitizer.sanitize("{\"verdict\":\"X\",\"issues\":[]}")).isEqualTo("{\"verdict\":\"X\",\"issues\":[]}");
     }
+
+    @Test
+    void sanitizer_stripsThinkTags() {
+        String raw = "\u003cthink\u003ereasoning\u003c/think\u003e\n{\"verdict\":\"OK\",\"issues\":[]}\n";
+        assertThat(LlmOutputSanitizer.sanitize(raw)).isEqualTo("{\"verdict\":\"OK\",\"issues\":[]}");
+    }
+
+    @Test
+    void extractFirstJsonObject_pullsObjectFromProse() {
+        String prose = "Here you go: {\"verdict\":\"OK\",\"issues\":[]} trailing";
+        assertThat(LlmOutputSanitizer.extractFirstJsonObject(prose)).isEqualTo("{\"verdict\":\"OK\",\"issues\":[]}");
+    }
 }

@@ -73,6 +73,10 @@
                     <span class="text-muted">Mentor remarks:</span>
                     <span th:text="${entry.mentorRemarks}">—</span>
                 </div>
+                <div class="small mt-1 text-danger" th:if="${entry.status.name() == 'ERROR' and entry.errorMessage != null and !entry.errorMessage.isBlank()}">
+                    <span class="text-muted">Error:</span>
+                    <span th:text="${entry.errorMessage}">—</span>
+                </div>
             </div>
         </div>
     </div>

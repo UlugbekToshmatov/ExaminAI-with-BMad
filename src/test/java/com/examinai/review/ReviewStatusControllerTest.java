@@ -132,6 +132,19 @@ class ReviewStatusControllerTest {
             .andExpect(jsonPath("$.errorMessage", is("Something went wrong.")));
     }
 
+    @Test
+    @WithMockUser(username = "alice", roles = "INTERN")
+    void error_blankStoredMessage_returnsFallback() throws Exception {
+        TaskReview tr = reviewOwnedBy(9L, "alice", ReviewStatus.ERROR, "   ");
+        when(taskReviewRepository.findByIdWithInternForStatusJson(eq(9L)))
+            .thenReturn(Optional.of(tr));
+
+        mockMvc.perform(get("/reviews/9/status"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status", is("ERROR")))
+            .andExpect(jsonPath("$.errorMessage", is(ReviewMessages.ERROR_DETAIL_FALLBACK)));
+    }
+
     private static TaskReview reviewOwnedBy(long id, String internUsername, ReviewStatus status, String err) {
         UserAccount intern = new UserAccount();
         intern.setUsername(internUsername);

@@ -36,6 +36,16 @@
             spin.setAttribute('aria-hidden', 'true');
           }
         }
+        var errPanel = root.querySelector('#review-error-alert');
+        if (errPanel) {
+          if (data.status === 'ERROR') {
+            errPanel.textContent = data.errorMessage || 'Review failed with no saved detail. Try submitting again or contact support.';
+            errPanel.classList.remove('d-none');
+          } else {
+            errPanel.classList.add('d-none');
+            errPanel.textContent = '';
+          }
+        }
         if (data.status === 'APPROVED' || data.status === 'REJECTED' || data.status === 'ERROR') {
           clearInterval(handle);
         }

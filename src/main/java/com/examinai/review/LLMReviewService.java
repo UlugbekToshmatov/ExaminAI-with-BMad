@@ -29,10 +29,22 @@ public class LLMReviewService {
         ));
         String raw = chatModel.call(prompt).getResult().getOutput().getText();
         String cleaned = LlmOutputSanitizer.sanitize(raw);
-        ReviewFeedback feedback = converter.convert(cleaned);
+        ReviewFeedback feedback = parseFeedback(cleaned);
         if (feedback == null) {
             throw new IllegalStateException("LLM output could not be parsed into ReviewFeedback: " + cleaned);
         }
         return feedback;
+    }
+
+    private ReviewFeedback parseFeedback(String cleaned) {
+        try {
+            return converter.convert(cleaned);
+        } catch (Exception ignored) {
+            String extracted = LlmOutputSanitizer.extractFirstJsonObject(cleaned);
+            if (extracted != null) {
+                return converter.convert(extracted);
+            }
+            return null;
+        }
     }
 }

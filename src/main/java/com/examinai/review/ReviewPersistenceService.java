@@ -63,7 +63,8 @@ public class ReviewPersistenceService {
     public void markPipelineError(Long reviewId, String message) {
         taskReviewRepository.findById(reviewId).ifPresentOrElse(tr -> {
             tr.setStatus(ReviewStatus.ERROR);
-            tr.setErrorMessage(truncate(message, 500));
+            String m = message == null || message.isBlank() ? ReviewMessages.ERROR_DETAIL_FALLBACK : message;
+            tr.setErrorMessage(truncate(m, 500));
             taskReviewRepository.save(tr);
         }, () -> log.warn("markPipelineError: TaskReview {} not found — status not updated", reviewId));
     }

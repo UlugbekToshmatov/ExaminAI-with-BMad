@@ -11,9 +11,13 @@
         <p class="text-muted small mb-2" th:text="${review.task.course.courseName}">Course</p>
         <div th:replace="~{fragments/review-status-badge :: statusBadge(${review.status})}"></div>
 
-        <div class="alert alert-danger mt-2 mb-0 py-2 small" role="alert"
-             th:if="${review.status.name() == 'ERROR' and review.errorMessage != null and !review.errorMessage.isBlank()}"
-             th:text="${review.errorMessage}">Error</div>
+        <!-- Filled on first paint when ERROR; updated by review-polling.js when status flips to ERROR. -->
+        <div id="review-error-alert"
+             class="alert alert-danger mt-2 mb-0 py-2 small"
+             role="alert"
+             aria-live="assertive"
+             th:classappend="${review.status.name() == 'ERROR' and review.errorMessage != null and !review.errorMessage.isBlank()} ? '' : ' d-none'"
+             th:text="${review.errorMessage != null ? review.errorMessage : ''}"></div>
 
         <div class="mt-2" th:if="${review.status.name() == 'REJECTED' and review.mentorRemarks != null and !review.mentorRemarks.isBlank()}">
             <h6 class="text-muted text-uppercase small mb-1">Mentor remarks</h6>

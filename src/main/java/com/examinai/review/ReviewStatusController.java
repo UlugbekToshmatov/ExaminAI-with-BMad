@@ -30,7 +30,13 @@ public class ReviewStatusController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         ReviewStatus s = tr.getStatus();
-        String err = s == ReviewStatus.ERROR ? sanitizeErrorMessageForClient(tr.getErrorMessage()) : null;
+        String err = null;
+        if (s == ReviewStatus.ERROR) {
+            err = sanitizeErrorMessageForClient(tr.getErrorMessage());
+            if (err == null || err.isBlank()) {
+                err = ReviewMessages.ERROR_DETAIL_FALLBACK;
+            }
+        }
         return new ReviewStatusResponse(
             tr.getId(),
             s.name(),
