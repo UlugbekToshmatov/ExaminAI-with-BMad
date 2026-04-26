@@ -2,6 +2,7 @@ package com.examinai.review;
 
 import com.examinai.config.SecurityConfig;
 import com.examinai.course.Course;
+import com.examinai.task.InternTaskPage;
 import com.examinai.task.Task;
 import com.examinai.task.TaskService;
 import org.junit.jupiter.api.Test;
@@ -58,8 +59,8 @@ class ReviewSubmissionControllerTest {
         Course course = new Course();
         course.setCourseName("C");
         task.setCourse(course);
-        when(taskService.findForInternTaskDetail("user", 1L)).thenReturn(task);
-        when(taskService.findSubmissionHistoryForInternTask("user", 1L)).thenReturn(List.of());
+        when(taskService.loadInternTaskPage("user", 1L))
+            .thenReturn(new InternTaskPage(task, List.of(), InternTaskSubmissionInfo.allowed()));
 
         mockMvc.perform(post("/intern/tasks/1/submit")
                 .with(csrf())
@@ -69,6 +70,6 @@ class ReviewSubmissionControllerTest {
             .andExpect(status().isOk())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("intern/task-detail"));
 
-        verify(taskService).findSubmissionHistoryForInternTask("user", 1L);
+        verify(taskService).loadInternTaskPage("user", 1L);
     }
 }

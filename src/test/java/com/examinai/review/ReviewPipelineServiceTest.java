@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.core.JsonParseException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import java.net.SocketTimeoutException;
@@ -21,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -36,6 +38,7 @@ class ReviewPipelineServiceTest {
     @Mock TaskReviewRepository taskReviewRepository;
     @Mock TaskRepository taskRepository;
     @Mock InternTaskAccessService internTaskAccessService;
+    @Mock InternReviewSubmissionEligibility internReviewSubmissionEligibility;
     @Mock UserAccountRepository userAccountRepository;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock GitHubClient gitHubClient;
@@ -49,6 +52,7 @@ class ReviewPipelineServiceTest {
     void submit_flushesPendingThenPublishesPipelineEvent() {
         UserAccount intern = new UserAccount();
         intern.setUsername("intern");
+        ReflectionTestUtils.setField(intern, "id", 55L);
         UserAccount mentor = new UserAccount();
         mentor.setUsername("mentor");
         Course course = new Course();
@@ -62,6 +66,7 @@ class ReviewPipelineServiceTest {
         when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
         when(taskRepository.findByIdWithCourseAndMentor(7L)).thenReturn(Optional.of(task));
         doNothing().when(internTaskAccessService).assertInternReadAccessForCurrentUser(task);
+        doNothing().when(internReviewSubmissionEligibility).requireCanStartSubmission(eq(7L), anyLong());
         when(taskReviewRepository.saveAndFlush(any(TaskReview.class))).thenAnswer(inv -> {
             TaskReview tr = inv.getArgument(0);
             tr.setId(100L);

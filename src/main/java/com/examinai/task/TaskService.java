@@ -2,6 +2,7 @@ package com.examinai.task;
 
 import com.examinai.course.Course;
 import com.examinai.course.CourseRepository;
+import com.examinai.review.InternReviewSubmissionEligibility;
 import com.examinai.review.TaskReview;
 import com.examinai.review.TaskReviewRepository;
 import com.examinai.stack.Stack;
@@ -26,17 +27,20 @@ public class TaskService {
     private final UserAccountRepository userAccountRepository;
     private final TaskReviewRepository taskReviewRepository;
     private final InternTaskAccessService internTaskAccessService;
+    private final InternReviewSubmissionEligibility internReviewSubmissionEligibility;
 
     public TaskService(TaskRepository taskRepository,
                        CourseRepository courseRepository,
                        UserAccountRepository userAccountRepository,
                        TaskReviewRepository taskReviewRepository,
-                       InternTaskAccessService internTaskAccessService) {
+                       InternTaskAccessService internTaskAccessService,
+                       InternReviewSubmissionEligibility internReviewSubmissionEligibility) {
         this.taskRepository = taskRepository;
         this.courseRepository = courseRepository;
         this.userAccountRepository = userAccountRepository;
         this.taskReviewRepository = taskReviewRepository;
         this.internTaskAccessService = internTaskAccessService;
+        this.internReviewSubmissionEligibility = internReviewSubmissionEligibility;
     }
 
     @Transactional(readOnly = true)
@@ -132,6 +136,20 @@ public class TaskService {
             .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
         internTaskAccessService.assertInternReadAccessForCurrentUser(task);
         return taskReviewRepository.findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(taskId, intern.getId());
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
+    public InternTaskPage loadInternTaskPage(String username, long taskId) {
+        UserAccount intern = userAccountRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
+        Task task = taskRepository.findByIdWithCourseAndMentor(taskId)
+            .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+        internTaskAccessService.assertInternReadAccessForCurrentUser(task);
+        var history = taskReviewRepository
+            .findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(taskId, intern.getId());
+        var submissionInfo = internReviewSubmissionEligibility.evaluateForInternTask(taskId, intern.getId());
+        return new InternTaskPage(task, history, submissionInfo);
     }
 
     @Transactional(readOnly = true)

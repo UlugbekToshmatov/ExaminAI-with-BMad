@@ -2,6 +2,7 @@ package com.examinai.task;
 
 import com.examinai.course.Course;
 import com.examinai.course.CourseRepository;
+import com.examinai.review.InternReviewSubmissionEligibility;
 import com.examinai.review.TaskReviewRepository;
 import com.examinai.stack.Stack;
 import com.examinai.task.TaskWithReview;
@@ -39,6 +40,7 @@ class TaskServiceTest {
     @Mock UserAccountRepository userAccountRepository;
     @Mock TaskReviewRepository taskReviewRepository;
     @Mock InternTaskAccessService internTaskAccessService;
+    @Mock InternReviewSubmissionEligibility internReviewSubmissionEligibility;
     @InjectMocks TaskService taskService;
 
     @AfterEach

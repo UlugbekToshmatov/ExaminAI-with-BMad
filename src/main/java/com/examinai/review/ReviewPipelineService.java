@@ -34,6 +34,7 @@ public class ReviewPipelineService {
     private final TaskReviewRepository taskReviewRepository;
     private final TaskRepository taskRepository;
     private final InternTaskAccessService internTaskAccessService;
+    private final InternReviewSubmissionEligibility internReviewSubmissionEligibility;
     private final UserAccountRepository userAccountRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final GitHubClient gitHubClient;
@@ -43,6 +44,7 @@ public class ReviewPipelineService {
     public ReviewPipelineService(TaskReviewRepository taskReviewRepository,
                                  TaskRepository taskRepository,
                                  InternTaskAccessService internTaskAccessService,
+                                 InternReviewSubmissionEligibility internReviewSubmissionEligibility,
                                  UserAccountRepository userAccountRepository,
                                  ApplicationEventPublisher eventPublisher,
                                  GitHubClient gitHubClient,
@@ -51,6 +53,7 @@ public class ReviewPipelineService {
         this.taskReviewRepository = taskReviewRepository;
         this.taskRepository = taskRepository;
         this.internTaskAccessService = internTaskAccessService;
+        this.internReviewSubmissionEligibility = internReviewSubmissionEligibility;
         this.userAccountRepository = userAccountRepository;
         this.eventPublisher = eventPublisher;
         this.gitHubClient = gitHubClient;
@@ -74,9 +77,7 @@ public class ReviewPipelineService {
         tr.setGithubRepoOwner(repoOwner);
         tr.setGithubRepoName(repoName);
         tr.setGithubPrNumber(prNumber);
-        if (taskReviewRepository.existsByTask_IdAndIntern_IdAndStatus(taskId, intern.getId(), ReviewStatus.PENDING)) {
-            throw new IllegalStateException("A review is already pending for this task.");
-        }
+        internReviewSubmissionEligibility.requireCanStartSubmission(taskId, intern.getId());
         tr = taskReviewRepository.saveAndFlush(tr);
         eventPublisher.publishEvent(new ReviewPipelineStartedEvent(tr.getId()));
         return tr.getId();

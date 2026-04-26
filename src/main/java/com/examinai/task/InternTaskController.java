@@ -24,9 +24,12 @@ public class InternTaskController {
     @GetMapping("/tasks/{taskId}")
     @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
     public String taskDetail(@PathVariable Long taskId, Model model, Authentication auth) {
-        model.addAttribute("task", taskService.findForInternTaskDetail(auth.getName(), taskId));
+        var page = taskService.loadInternTaskPage(auth.getName(), taskId);
+        model.addAttribute("task", page.task());
         model.addAttribute("submission", new ReviewSubmissionDto());
-        model.addAttribute("submissionHistory", taskService.findSubmissionHistoryForInternTask(auth.getName(), taskId));
+        model.addAttribute("submissionHistory", page.submissionHistory());
+        model.addAttribute("canSubmit", page.submissionInfo().canSubmit());
+        model.addAttribute("submitBlockReason", page.submissionInfo().blockReason());
         return "intern/task-detail";
     }
 
