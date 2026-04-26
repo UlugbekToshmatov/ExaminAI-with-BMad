@@ -16,7 +16,8 @@ classification:
 # Product Requirements Document — ExaminAI
 
 **Author:** Ulugbek
-**Date:** 2026-04-19
+**Date:** 2026-04-19  
+**Last aligned with implementation (stacks, submissions, nav):** 2026-04-26 — see `docs/requirements.md` (Platform updates section) and FR34–FR39 below
 
 ## Executive Summary
 
@@ -381,6 +382,17 @@ Performance requirements are specified in the Non-Functional Requirements sectio
 - **FR32:** Mentor can view the task and review list across their assigned interns, filterable by intern name, task, and status
 - **FR33:** Admin can view task and review status across all interns and all mentors
 
+### Stacks, access, and submission control (aligned with `docs/requirements.md`, 2026-04-26)
+
+- **FR34:** Each **Course** is associated with exactly one **Stack** (e.g. Java, React); all Tasks in that Course share the same stack
+- **FR35:** **Admin** can manage the **stack catalog** (create, read, update, delete) and cannot delete a stack that is still referenced by a course or user
+- **FR36:** **Intern** accounts have one or more assigned stacks; the intern’s task list and task access are limited to tasks whose course stack matches an assigned stack (enforced server-side)
+- **FR37:** The system **blocks** a new review submission for an intern+task when an existing review is in **`APPROVED`**, **`PENDING`**, or **`LLM_EVALUATED`**; **`REJECTED`** and **`ERROR`** allow a new attempt
+- **FR38:** When a submission is blocked by these rules, the user is **redirected** to the task page with a **flash message** instead of an unhandled error page
+- **FR39:** The main navigation **highlights the active section** (current app area) for orientation
+
+**Authoritative detail:** behavior, schema notes, and implementation pointers are in **`docs/requirements.md`** → *Platform updates — stacks, submissions, admin, and UI (2026-04-26)*.
+
 ## Non-Functional Requirements
 
 ### Performance
@@ -416,3 +428,10 @@ Performance requirements are specified in the Non-Functional Requirements sectio
 - PostgreSQL data persists across container restarts via a named Docker volume
 - Ollama model data (`qwen2.5-coder:3b`, ~2 GB) persists across container restarts via a named Docker volume
 - Async review thread pool configured with graceful shutdown: in-flight reviews complete before application exits (`awaitTerminationSeconds: 120`)
+
+---
+
+## Document maintenance
+
+- **Requirements source of truth:** Day-to-day product and schema behavior (including post-MVP updates such as stacks and submission rules) should be reflected in **`docs/requirements.md`** first; this PRD’s functional requirements (FR34–FR39) summarize the same commitments for planning and reviews.
+- **Cross-reference:** Architecture and epics under `_bmad-output/planning-artifacts/` may be updated in a future pass for full consistency; until then, treat `docs/requirements.md` and the FR block above as aligned for the 2026-04-26 implementation work.

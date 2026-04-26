@@ -702,6 +702,20 @@ examin-ai/
 
 ---
 
+### Supplement — stacks, intern access, submission gating, navigation (2026-04-26)
+
+**Source of truth:** `docs/requirements.md` → *Platform updates — stacks, submissions, admin, and UI (2026-04-26)* and the PRD (`prd.md`) → FR34–FR39.
+
+**Domain / data:** `Stack` entity; `Course` has required FK to `Stack`; `UserAccount` has many-to-many stacks for interns (`user_account_stack`). Liquibase changelog `006-stacks-and-course-stack.sql`.
+
+**Application layer:** `InternTaskAccessService` enforces stack match for intern-facing task reads and submissions; `InternReviewSubmissionEligibility` centralizes when a new `TaskReview` may be started (blocks `APPROVED` / `PENDING` / `LLM_EVALUATED`); `ReviewSubmissionBlockedException` is handled by `ReviewSubmissionExceptionHandler` (redirect + flash). `TaskService.loadInternTaskPage` batches task + history + eligibility for the intern task detail view.
+
+**Admin:** `AdminStackController` + `StackService` provide stack CRUD; course and user forms include stack selection as already wired in the app.
+
+**UI:** `layout/base.html` marks the active nav link from `navRequestUri` / `navContextPath` (`NavViewAdvice`); styles in `custom.css` for `.nav-link.active`.
+
+---
+
 ### Architectural Boundaries
 
 **API Boundaries:**
@@ -811,7 +825,7 @@ Project structure directly reflects the package-by-feature decision. Template di
 
 ### Requirements Coverage Validation ✅
 
-**Functional Requirements (33/33 covered):**
+**Functional Requirements (39/39 covered — FR34–FR39 added 2026-04-26; see PRD + `docs/requirements.md`):**
 
 | FR Range | Category | Coverage |
 |---|---|---|
@@ -823,6 +837,7 @@ Project structure directly reflects the package-by-feature decision. Template di
 | FR24–FR28 | Mentor Review & Decision | `MentorReviewController`, `review-queue.html`, `review-detail.html` |
 | FR29–FR30 | Notifications | `NotificationService`, `AiReviewCompleteEvent`, `MentorDecisionEvent` |
 | FR31–FR33 | Progress Tracking | `task-list.html`, `review-queue.html`, `admin/dashboard.html` |
+| FR34–FR39 | Stacks, access, submission control, nav | `Stack` / `StackService`, `AdminStackController`, `InternTaskAccessService`, `InternReviewSubmissionEligibility`, `ReviewSubmissionExceptionHandler`, `NavViewAdvice`, `006-stacks-*.sql`, `layout/base.html` |
 
 **Non-Functional Requirements:**
 

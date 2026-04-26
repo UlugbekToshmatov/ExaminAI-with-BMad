@@ -1,4 +1,7 @@
 ExaminAI BMAD
+
+**Planning alignment:** Product-level FR summary lives in `_bmad-output/planning-artifacts/prd.md` (including FR34–FR39, 2026-04-26). Architecture notes: `_bmad-output/planning-artifacts/architecture.md` (supplement for stacks and submission gating). This file is the **authoritative** requirements + schema narrative for implementers.
+
 ——— Attempt with idea and empty context ——
 I want an AI powered application that allows mentors to review interns' codes using AI-powered tools that help to achieve readable and clean code.
 
@@ -14,8 +17,9 @@ The application allows checking developers’ code using the GitHub API combined
 ## Main Logic
 
 ### Intern
-- Can see the task list of the course with its technology (e.g., Java, Python, etc.).
-- Can submit a task (by providing a commit branch, PR name, or PR number through a form).
+- Is assigned one or more **technology stacks** (e.g. Java, React). Can **only** see and open tasks for courses whose **stack** matches one of those assignments (not the full platform catalog).
+- Can see the task list (filtered by stack), course name, and related technology metadata.
+- Can submit a task (repo owner, repo name, PR number) when allowed by submission rules (see **Intern review submission rules** below).
 - Can see the review result with comments.
 - Can see their own progress.
 
@@ -26,7 +30,9 @@ The application allows checking developers’ code using the GitHub API combined
 - Can perform a review (manually reject or accept a task).
 
 ### Admin
-- Full access and functionality as a mentor and as an intern
+- Full access and functionality as a mentor and as an intern (except intern-only views still respect the same submission and stack rules when using intern URLs).
+- Manages the **stack catalog** (create / edit / delete stacks) and assigns stacks to users and courses as described below.
+
 ---
 
 ## Review Process
@@ -83,13 +89,22 @@ The review is processed **asynchronously** because LLM inference takes 10–60 s
 - `role` (enum: `INTERN`, `MENTOR`, `ADMIN`)
 - `active` (default: `true`)
 - `dateCreated` (default: current timestamp)
+- **Stacks (interns only):** many-to-many with `Stack` via join table `user_account_stack`. At least one stack is required when creating an **INTERN** account. Admins can update an intern’s stacks later.
+
+---
+
+### Stack
+- `id`
+- `name` (unique, required) — e.g. `Java`, `React`, `TypeScript`
+- Managed by **Admin** (full CRUD). A stack cannot be deleted while any **course** or **user** still references it.
 
 ---
 
 ### Course
 - `id`
 - `courseName`
-- `technology` (e.g., Java, Python)
+- `technology` (optional free text, e.g. Java, Python — distinct from the formal **stack**)
+- **`stack_id`** (FK → `Stack`, required) — all tasks in the course share this stack
 - `dateCreated` (default: current timestamp)
 
 ---
@@ -113,7 +128,7 @@ The review is processed **asynchronously** because LLM inference takes 10–60 s
 - `taskId` (FK → Task)
 - `internId` (FK → UserAccount)
 - `mentorId` (FK → UserAccount — assigned reviewer)
-- `status` (enum: `PENDING`, `LLM_EVALUATED`, `APPROVED`, `REJECTED`)
+- `status` (enum: `PENDING`, `LLM_EVALUATED`, `APPROVED`, `REJECTED`, `ERROR`)
 - `llmResult` (e.g., `APPROVED` — AI suggestion)
 - `mentorResult` (e.g., `APPROVED` — final human decision)
 - `mentorRemarks`
@@ -198,3 +213,35 @@ Please, add to the DB
  - intern entry
  - course entry
  - several tasks assigned to the course and intern, and mentor as an owner
+
+---
+
+## Platform updates — stacks, submissions, admin, and UI (2026-04-26)
+
+This section aligns **requirements** with behavior implemented in the codebase. The PRD (`_bmad-output/planning-artifacts/prd.md`) includes a short **alignment** subsection that points here for detail.
+
+### Stacks and visibility
+- Each **course** belongs to exactly one **stack**; all tasks in that course inherit it.
+- Each **intern** may have **multiple** stacks (e.g. Java + React for full-stack paths).
+- Intern **task list** and **task detail** only include tasks whose course stack is in the intern’s assigned stacks. **Admins** browsing intern URLs see the full catalog (unchanged for admin preview).
+- Access to task detail, submission, and intern review status is enforced server-side (`InternTaskAccessService` and related checks) so URLs cannot bypass stack rules.
+
+### Admin stack catalog (CRUD)
+- Admins can **list / create / edit / delete** stacks under `/admin/stacks`.
+- Delete is blocked with a clear message if any course or user still uses the stack.
+
+### Intern review submission rules
+- A **new** submission is **not** allowed when, for that intern and task, a review already exists with status:
+  - **`APPROVED`** — task is complete for that intern; no further submissions.
+  - **`PENDING`** — pipeline not finished; intern must wait.
+  - **`LLM_EVALUATED`** — awaiting mentor decision; no parallel submission.
+- **`REJECTED`** and **`ERROR`** allow a **new** attempt (resubmit).
+- If a duplicate blocked submission is attempted (e.g. second submit while **PENDING**), the app **redirects** back to the task page with a **flash message** instead of a generic error page (`ReviewSubmissionBlockedException` + MVC advice).
+- The task detail page shows the submit form only when submission is allowed; otherwise a short **reason** is shown.
+
+### Layout and navigation
+- The main navbar highlights the **current section** (active link) using request path + context path. Model attributes `navContextPath` and `navRequestUri` are set by `NavViewAdvice` so Thymeleaf works in all environments (including tests).
+
+### Implementation pointers (for developers / AI context)
+- Liquibase: stack tables and `course.stack_id` introduced in changelog `006-stacks-and-course-stack.sql` (see `db/changelog`).
+- Aggregated intern task page load: `TaskService.loadInternTaskPage` (task, history, submission eligibility) to avoid redundant fetches.
