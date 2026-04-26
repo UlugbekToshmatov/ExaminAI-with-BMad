@@ -3,6 +3,7 @@ package com.examinai.user;
 import com.examinai.admin.AdminController;
 import com.examinai.admin.AdminDashboardService;
 import com.examinai.admin.AdminDashboardView;
+import com.examinai.config.NavViewAdvice;
 import com.examinai.config.SecurityConfig;
 import com.examinai.review.InternReviewStatusController;
 import com.examinai.review.InternTaskSubmissionInfo;
@@ -45,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     ReviewSubmissionController.class,
     InternReviewStatusController.class
 })
-@Import(SecurityConfig.class)
+@Import({ SecurityConfig.class, NavViewAdvice.class })
 class SecurityIntegrationTest {
 
     @Autowired

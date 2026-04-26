@@ -17,37 +17,37 @@
     <!-- Accessibility: skip link -->
     <a href="#main-content" class="visually-hidden-focusable">Skip to content</a>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark" th:with="cp=${navContextPath} ?: '', uri=${navRequestUri} ?: ''">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" th:href="@{/}">ExaminAI</a>
             <ul class="navbar-nav flex-row flex-wrap gap-2 align-items-center me-auto mb-2 mb-lg-0 small"
                 sec:authorize="isAuthenticated()">
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
-                    <a class="nav-link py-1" th:href="@{/admin/dashboard}">Dashboard</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/admin/dashboard')} ? 'active' : _" th:href="@{/admin/dashboard}">Dashboard</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
-                    <a class="nav-link py-1" th:href="@{/admin/users}">Users</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/admin/users')} ? 'active' : _" th:href="@{/admin/users}">Users</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasAnyRole('ADMIN','MENTOR')">
-                    <a class="nav-link py-1" th:href="@{/mentor/reviews}">Reviews</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/mentor/reviews')} ? 'active' : _" th:href="@{/mentor/reviews}">Reviews</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
-                    <a class="nav-link py-1" th:href="@{/admin/stacks}">Stacks</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/admin/stacks')} ? 'active' : _" th:href="@{/admin/stacks}">Stacks</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
-                    <a class="nav-link py-1" th:href="@{/admin/courses}">Courses</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/admin/courses')} ? 'active' : _" th:href="@{/admin/courses}">Courses</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
-                    <a class="nav-link py-1" th:href="@{/admin/tasks}">Tasks</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/admin/tasks')} ? 'active' : _" th:href="@{/admin/tasks}">Tasks</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('MENTOR')">
-                    <a class="nav-link py-1" th:href="@{/mentor/courses}">Courses</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/mentor/courses')} ? 'active' : _" th:href="@{/mentor/courses}">Courses</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('MENTOR')">
-                    <a class="nav-link py-1" th:href="@{/mentor/tasks}">Tasks</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/mentor/tasks')} ? 'active' : _" th:href="@{/mentor/tasks}">Tasks</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('INTERN')">
-                    <a class="nav-link py-1" th:href="@{/intern/tasks}">My tasks</a>
+                    <a class="nav-link py-1" th:classappend="${#strings.startsWith(uri, cp + '/intern/')} ? 'active' : _" th:href="@{/intern/tasks}">My tasks</a>
                 </li>
             </ul>
             <div class="navbar-nav ms-auto d-flex flex-row align-items-center gap-3"

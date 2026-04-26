@@ -1,5 +1,6 @@
 package com.examinai.review;
 
+import com.examinai.config.NavViewAdvice;
 import com.examinai.config.SecurityConfig;
 import com.examinai.course.Course;
 import com.examinai.task.Task;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(controllers = MentorReviewController.class)
-@Import(SecurityConfig.class)
+@Import({ SecurityConfig.class, NavViewAdvice.class })
 class MentorReviewControllerTest {
 
     @Autowired

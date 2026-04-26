@@ -1,5 +1,6 @@
 package com.examinai.review;
 
+import com.examinai.config.NavViewAdvice;
 import com.examinai.config.SecurityConfig;
 import com.examinai.course.Course;
 import com.examinai.task.InternTaskAccessService;
@@ -24,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = InternReviewStatusController.class)
-@Import(SecurityConfig.class)
+@Import({ SecurityConfig.class, NavViewAdvice.class })
 class InternReviewStatusControllerTest {
 
     @Autowired

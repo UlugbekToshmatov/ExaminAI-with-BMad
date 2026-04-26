@@ -1,5 +1,6 @@
 package com.examinai.admin;
 
+import com.examinai.config.NavViewAdvice;
 import com.examinai.config.SecurityConfig;
 import com.examinai.review.MentorQueueLabelValue;
 import com.examinai.review.ReviewStatus;
@@ -33,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(controllers = AdminController.class)
-@Import(SecurityConfig.class)
+@Import({ SecurityConfig.class, NavViewAdvice.class })
 class AdminControllerDashboardTest {
 
     @Autowired

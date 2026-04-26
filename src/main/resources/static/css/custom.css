@@ -2,6 +2,15 @@
 :root {
     --ai-feedback-bg: #f8f9fa;
     --mentor-decision-bg: #ffffff;
+    --examinai-nav-active-border: #0d6efd;
+}
+
+/* Main navbar — highlight current page (see layout/base.html) */
+.navbar.navbar-dark .navbar-nav .nav-link.py-1.active {
+    color: #fff !important;
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 0 var(--examinai-nav-active-border, #0d6efd);
+    padding-bottom: 0.2rem;
 }
 
 /* AI-generated content style — visually distinct from mentor decisions */
