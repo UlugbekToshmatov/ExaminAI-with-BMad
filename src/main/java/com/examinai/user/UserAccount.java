@@ -1,7 +1,10 @@
 package com.examinai.user;
 
+import com.examinai.stack.Stack;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "user_account")
@@ -30,6 +33,14 @@ public class UserAccount {
     @Column(name = "date_created", nullable = false)
     private LocalDateTime dateCreated;
 
+    @ManyToMany
+    @JoinTable(
+        name = "user_account_stack",
+        joinColumns = @JoinColumn(name = "user_account_id"),
+        inverseJoinColumns = @JoinColumn(name = "stack_id")
+    )
+    private Set<Stack> stacks = new HashSet<>();
+
     @PrePersist
     protected void onCreate() {
         dateCreated = LocalDateTime.now();
@@ -47,4 +58,6 @@ public class UserAccount {
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public LocalDateTime getDateCreated() { return dateCreated; }
+    public Set<Stack> getStacks() { return stacks; }
+    public void setStacks(Set<Stack> stacks) { this.stacks = stacks; }
 }

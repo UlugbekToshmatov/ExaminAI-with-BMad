@@ -2,6 +2,7 @@ package com.examinai.review;
 
 import com.examinai.config.SecurityConfig;
 import com.examinai.course.Course;
+import com.examinai.task.InternTaskAccessService;
 import com.examinai.task.Task;
 import com.examinai.user.UserAccount;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +14,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.Optional;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -30,8 +33,12 @@ class InternReviewStatusControllerTest {
     @MockBean
     TaskReviewRepository taskReviewRepository;
 
+    @MockBean
+    InternTaskAccessService internTaskAccessService;
+
     @BeforeEach
     void setUp() {
+        doNothing().when(internTaskAccessService).assertInternReadAccess(any(), any());
         UserAccount intern = new UserAccount();
         intern.setUsername("intern");
         TaskReview tr = new TaskReview();

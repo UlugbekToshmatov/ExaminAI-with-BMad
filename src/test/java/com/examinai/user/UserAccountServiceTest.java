@@ -1,5 +1,7 @@
 package com.examinai.user;
 
+import com.examinai.stack.Stack;
+import com.examinai.stack.StackRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
@@ -22,6 +25,7 @@ import static org.mockito.Mockito.*;
 class UserAccountServiceTest {
 
     @Mock UserAccountRepository userAccountRepository;
+    @Mock StackRepository stackRepository;
     @Mock PasswordEncoder passwordEncoder;
 
     @InjectMocks UserAccountService userAccountService;
@@ -45,8 +49,13 @@ class UserAccountServiceTest {
         dto.setEmail("new@test.com");
         dto.setRole(Role.INTERN);
         dto.setPassword("plain123");
+        Stack javaStack = new Stack();
+        ReflectionTestUtils.setField(javaStack, "id", 1L);
+        javaStack.setName("Java");
+        dto.getStackIds().add(1L);
 
         when(userAccountRepository.existsByUsername("newuser")).thenReturn(false);
+        when(stackRepository.findAllById(any())).thenReturn(List.of(javaStack));
         when(passwordEncoder.encode("plain123")).thenReturn("$2a$12$encoded");
         when(userAccountRepository.save(any(UserAccount.class)))
             .thenAnswer(inv -> inv.getArgument(0));

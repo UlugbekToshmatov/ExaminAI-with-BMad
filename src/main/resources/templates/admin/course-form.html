@@ -22,6 +22,15 @@
             <label for="technology" class="form-label">Technology</label>
             <input type="text" class="form-control" id="technology" th:field="*{technology}">
         </div>
+        <div class="mb-3">
+            <label for="stackId" class="form-label">Stack</label>
+            <select class="form-select" id="stackId" th:field="*{stackId}" required
+                    th:classappend="${#fields.hasErrors('stackId')} ? 'is-invalid'">
+                <option value="" disabled th:selected="${courseDto.stackId == null}">Select stack</option>
+                <option th:each="s : ${stacks}" th:value="${s.id}" th:text="${s.name}">Java</option>
+            </select>
+            <div th:if="${#fields.hasErrors('stackId')}" class="invalid-feedback" th:errors="*{stackId}"></div>
+        </div>
         <button type="submit" class="btn btn-primary">Save Changes</button>
         <a th:href="${baseCourseUrl}" class="btn btn-link">Back to Courses</a>
     </form>
@@ -40,6 +49,15 @@
         <div class="mb-3">
             <label for="technology" class="form-label">Technology</label>
             <input type="text" class="form-control" id="technology" th:field="*{technology}">
+        </div>
+        <div class="mb-3">
+            <label for="stackId" class="form-label">Stack</label>
+            <select class="form-select" id="stackId" th:field="*{stackId}" required
+                    th:classappend="${#fields.hasErrors('stackId')} ? 'is-invalid'">
+                <option value="" disabled th:selected="${courseDto.stackId == null}">Select stack</option>
+                <option th:each="s : ${stacks}" th:value="${s.id}" th:text="${s.name}">Java</option>
+            </select>
+            <div th:if="${#fields.hasErrors('stackId')}" class="invalid-feedback" th:errors="*{stackId}"></div>
         </div>
         <button type="submit" class="btn btn-primary">Create Course</button>
         <a th:href="${baseCourseUrl}" class="btn btn-link">Back to Courses</a>

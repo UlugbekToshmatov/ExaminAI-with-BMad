@@ -1,5 +1,6 @@
 package com.examinai.course;
 
+import com.examinai.stack.Stack;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -17,6 +18,10 @@ public class Course {
     @Column(name = "technology")
     private String technology;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "stack_id", nullable = false)
+    private Stack stack;
+
     @Column(name = "date_created", nullable = false)
     private LocalDateTime dateCreated;
 
@@ -32,5 +37,7 @@ public class Course {
     public void setCourseName(String courseName) { this.courseName = courseName; }
     public String getTechnology() { return technology; }
     public void setTechnology(String technology) { this.technology = technology; }
+    public Stack getStack() { return stack; }
+    public void setStack(Stack stack) { this.stack = stack; }
     public LocalDateTime getDateCreated() { return dateCreated; }
 }

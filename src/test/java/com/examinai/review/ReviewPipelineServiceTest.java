@@ -1,6 +1,7 @@
 package com.examinai.review;
 
 import com.examinai.course.Course;
+import com.examinai.task.InternTaskAccessService;
 import com.examinai.task.Task;
 import com.examinai.task.TaskRepository;
 import com.examinai.user.UserAccount;
@@ -23,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,6 +35,7 @@ class ReviewPipelineServiceTest {
 
     @Mock TaskReviewRepository taskReviewRepository;
     @Mock TaskRepository taskRepository;
+    @Mock InternTaskAccessService internTaskAccessService;
     @Mock UserAccountRepository userAccountRepository;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock GitHubClient gitHubClient;
@@ -58,6 +61,7 @@ class ReviewPipelineServiceTest {
 
         when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
         when(taskRepository.findByIdWithCourseAndMentor(7L)).thenReturn(Optional.of(task));
+        doNothing().when(internTaskAccessService).assertInternReadAccessForCurrentUser(task);
         when(taskReviewRepository.saveAndFlush(any(TaskReview.class))).thenAnswer(inv -> {
             TaskReview tr = inv.getArgument(0);
             tr.setId(100L);

@@ -1,8 +1,10 @@
 package com.examinai.admin;
 
+import com.examinai.user.InternStackAssignmentDto;
 import com.examinai.user.Role;
 import com.examinai.user.UserAccountCreateDto;
 import com.examinai.user.UserAccountService;
+import com.examinai.stack.StackService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -17,12 +19,15 @@ public class AdminController {
 
     private final UserAccountService userAccountService;
     private final AdminDashboardService adminDashboardService;
+    private final StackService stackService;
 
     public AdminController(
         UserAccountService userAccountService,
-        AdminDashboardService adminDashboardService) {
+        AdminDashboardService adminDashboardService,
+        StackService stackService) {
         this.userAccountService = userAccountService;
         this.adminDashboardService = adminDashboardService;
+        this.stackService = stackService;
     }
 
     @GetMapping("/dashboard")
@@ -48,6 +53,7 @@ public class AdminController {
     public String userForm(Model model) {
         model.addAttribute("createDto", new UserAccountCreateDto());
         model.addAttribute("roles", Role.values());
+        model.addAttribute("stacks", stackService.findAll());
         return "admin/user-form";
     }
 
@@ -58,16 +64,52 @@ public class AdminController {
                               Model model) {
         if (bindingResult.hasErrors()) {
             model.addAttribute("roles", Role.values());
+            model.addAttribute("stacks", stackService.findAll());
             return "admin/user-form";
         }
         try {
             userAccountService.createUser(dto);
             return "redirect:/admin/users";
         } catch (IllegalArgumentException e) {
-            bindingResult.rejectValue("username", "duplicate", e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("Username already")) {
+                bindingResult.rejectValue("username", "duplicate", e.getMessage());
+            } else {
+                bindingResult.reject("createUser", e.getMessage());
+            }
             model.addAttribute("roles", Role.values());
+            model.addAttribute("stacks", stackService.findAll());
             return "admin/user-form";
         }
+    }
+
+    @GetMapping("/users/{id}/stacks")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String internStacksForm(@PathVariable Long id, Model model) {
+        var user = userAccountService.findByIdForStackEditor(id);
+        if (user.getRole() != Role.INTERN) {
+            return "redirect:/admin/users";
+        }
+        var dto = new InternStackAssignmentDto();
+        dto.setStackIds(user.getStacks().stream().map(s -> s.getId()).sorted().toList());
+        model.addAttribute("user", user);
+        model.addAttribute("stackDto", dto);
+        model.addAttribute("stacks", stackService.findAll());
+        return "admin/intern-stacks-form";
+    }
+
+    @PostMapping("/users/{id}/stacks")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateInternStacks(
+        @PathVariable Long id,
+        @ModelAttribute("stackDto") InternStackAssignmentDto stackDto,
+        RedirectAttributes redirectAttributes) {
+        try {
+            userAccountService.updateInternStacks(id, stackDto.getStackIds());
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/admin/users/" + id + "/stacks";
+        }
+        return "redirect:/admin/users";
     }
 
     @PostMapping("/users/{id}/deactivate")

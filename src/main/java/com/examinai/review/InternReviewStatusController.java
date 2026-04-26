@@ -1,5 +1,6 @@
 package com.examinai.review;
 
+import com.examinai.task.InternTaskAccessService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -15,9 +16,13 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternReviewStatusController {
 
     private final TaskReviewRepository taskReviewRepository;
+    private final InternTaskAccessService internTaskAccessService;
 
-    public InternReviewStatusController(TaskReviewRepository taskReviewRepository) {
+    public InternReviewStatusController(
+        TaskReviewRepository taskReviewRepository,
+        InternTaskAccessService internTaskAccessService) {
         this.taskReviewRepository = taskReviewRepository;
+        this.internTaskAccessService = internTaskAccessService;
     }
 
     @GetMapping("/{reviewId}")
@@ -29,6 +34,9 @@ public class InternReviewStatusController {
             .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
         if (!admin && !tr.getIntern().getUsername().equals(auth.getName())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        if (!admin) {
+            internTaskAccessService.assertInternReadAccess(auth, tr.getTask());
         }
         model.addAttribute("review", tr);
         model.addAttribute("submission", new ReviewSubmissionDto());

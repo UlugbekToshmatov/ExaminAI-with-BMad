@@ -2,6 +2,8 @@ package com.examinai.user;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserAccountCreateDto {
 
@@ -13,6 +15,9 @@ public class UserAccountCreateDto {
     @NotBlank(message = "Password is required")
     private String password;
 
+    /** For {@link Role#INTERN}: at least one id required (validated in service). */
+    private List<Long> stackIds = new ArrayList<>();
+
     public UserAccountCreateDto() {}
 
     public String getUsername() { return username; }
@@ -23,4 +28,6 @@ public class UserAccountCreateDto {
     public void setRole(Role role) { this.role = role; }
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+    public List<Long> getStackIds() { return stackIds; }
+    public void setStackIds(List<Long> stackIds) { this.stackIds = stackIds != null ? stackIds : new ArrayList<>(); }
 }

@@ -9,12 +9,25 @@ import java.util.Optional;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findAllByOrderByTaskNameAsc();
 
-    @Query("SELECT DISTINCT t FROM Task t JOIN FETCH t.course JOIN FETCH t.mentor ORDER BY t.taskName ASC")
+    @Query("SELECT DISTINCT t FROM Task t "
+        + "JOIN FETCH t.course c JOIN FETCH c.stack "
+        + "JOIN FETCH t.mentor ORDER BY t.taskName ASC")
     List<Task> findAllWithCourseAndMentorOrderByTaskNameAsc();
 
-    @Query("SELECT t FROM Task t JOIN FETCH t.course ORDER BY t.taskName ASC")
-    List<Task> findAllWithCourseOrderByTaskNameAsc();
+    @Query("SELECT t FROM Task t "
+        + "JOIN FETCH t.course c JOIN FETCH c.stack "
+        + "JOIN FETCH t.mentor "
+        + "WHERE c.stack.id IN :stackIds "
+        + "ORDER BY t.taskName ASC")
+    List<Task> findAllForInternByCourseStackIdIn(@Param("stackIds") java.util.List<Long> stackIds);
 
-    @Query("SELECT t FROM Task t JOIN FETCH t.course JOIN FETCH t.mentor WHERE t.id = :id")
+    @Query("SELECT t FROM Task t "
+        + "JOIN FETCH t.course c JOIN FETCH c.stack "
+        + "ORDER BY t.taskName ASC")
+    List<Task> findAllWithCourseAndStackOrderByTaskNameAsc();
+
+    @Query("SELECT t FROM Task t "
+        + "JOIN FETCH t.course c JOIN FETCH c.stack "
+        + "JOIN FETCH t.mentor WHERE t.id = :id")
     Optional<Task> findByIdWithCourseAndMentor(@Param("id") Long id);
 }

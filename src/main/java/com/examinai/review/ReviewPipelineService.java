@@ -1,5 +1,6 @@
 package com.examinai.review;
 
+import com.examinai.task.InternTaskAccessService;
 import com.examinai.task.Task;
 import com.examinai.task.TaskRepository;
 import com.examinai.user.UserAccount;
@@ -32,6 +33,7 @@ public class ReviewPipelineService {
 
     private final TaskReviewRepository taskReviewRepository;
     private final TaskRepository taskRepository;
+    private final InternTaskAccessService internTaskAccessService;
     private final UserAccountRepository userAccountRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final GitHubClient gitHubClient;
@@ -40,6 +42,7 @@ public class ReviewPipelineService {
 
     public ReviewPipelineService(TaskReviewRepository taskReviewRepository,
                                  TaskRepository taskRepository,
+                                 InternTaskAccessService internTaskAccessService,
                                  UserAccountRepository userAccountRepository,
                                  ApplicationEventPublisher eventPublisher,
                                  GitHubClient gitHubClient,
@@ -47,6 +50,7 @@ public class ReviewPipelineService {
                                  ReviewPersistenceService reviewPersistenceService) {
         this.taskReviewRepository = taskReviewRepository;
         this.taskRepository = taskRepository;
+        this.internTaskAccessService = internTaskAccessService;
         this.userAccountRepository = userAccountRepository;
         this.eventPublisher = eventPublisher;
         this.gitHubClient = gitHubClient;
@@ -60,6 +64,7 @@ public class ReviewPipelineService {
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
         Task task = taskRepository.findByIdWithCourseAndMentor(taskId)
             .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+        internTaskAccessService.assertInternReadAccessForCurrentUser(task);
         TaskReview tr = new TaskReview();
         tr.setTask(task);
         tr.setIntern(intern);

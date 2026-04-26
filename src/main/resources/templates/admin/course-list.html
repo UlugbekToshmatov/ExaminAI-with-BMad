@@ -19,6 +19,7 @@
             <thead>
                 <tr>
                     <th scope="col">Course Name</th>
+                    <th scope="col">Stack</th>
                     <th scope="col">Technology</th>
                     <th scope="col">Created</th>
                     <th scope="col">Actions</th>
@@ -27,6 +28,7 @@
             <tbody>
                 <tr th:each="course : ${courses}">
                     <td th:text="${course.courseName}"></td>
+                    <td th:text="${course.stack.name}"></td>
                     <td th:text="${course.technology}"></td>
                     <td th:text="${#temporals.format(course.dateCreated, 'dd MMM yyyy HH:mm')}"></td>
                     <td>

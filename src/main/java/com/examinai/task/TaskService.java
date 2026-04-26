@@ -4,6 +4,7 @@ import com.examinai.course.Course;
 import com.examinai.course.CourseRepository;
 import com.examinai.review.TaskReview;
 import com.examinai.review.TaskReviewRepository;
+import com.examinai.stack.Stack;
 import com.examinai.user.Role;
 import com.examinai.user.UserAccount;
 import com.examinai.user.UserAccountRepository;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
@@ -23,15 +25,18 @@ public class TaskService {
     private final CourseRepository courseRepository;
     private final UserAccountRepository userAccountRepository;
     private final TaskReviewRepository taskReviewRepository;
+    private final InternTaskAccessService internTaskAccessService;
 
     public TaskService(TaskRepository taskRepository,
                        CourseRepository courseRepository,
                        UserAccountRepository userAccountRepository,
-                       TaskReviewRepository taskReviewRepository) {
+                       TaskReviewRepository taskReviewRepository,
+                       InternTaskAccessService internTaskAccessService) {
         this.taskRepository = taskRepository;
         this.courseRepository = courseRepository;
         this.userAccountRepository = userAccountRepository;
         this.taskReviewRepository = taskReviewRepository;
+        this.internTaskAccessService = internTaskAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -109,8 +114,10 @@ public class TaskService {
     public Task findForInternTaskDetail(String username, Long taskId) {
         userAccountRepository.findByUsername(username)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
-        return taskRepository.findByIdWithCourseAndMentor(taskId)
+        Task task = taskRepository.findByIdWithCourseAndMentor(taskId)
             .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+        internTaskAccessService.assertInternReadAccessForCurrentUser(task);
+        return task;
     }
 
     /**
@@ -121,17 +128,28 @@ public class TaskService {
     public List<TaskReview> findSubmissionHistoryForInternTask(String username, Long taskId) {
         UserAccount intern = userAccountRepository.findByUsername(username)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
-        taskRepository.findByIdWithCourseAndMentor(taskId)
+        Task task = taskRepository.findByIdWithCourseAndMentor(taskId)
             .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+        internTaskAccessService.assertInternReadAccessForCurrentUser(task);
         return taskReviewRepository.findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(taskId, intern.getId());
     }
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasRole('INTERN') or hasRole('ADMIN')")
     public List<TaskWithReview> findForInternByUsername(String username) {
-        UserAccount intern = userAccountRepository.findByUsername(username)
+        UserAccount intern = userAccountRepository.findByUsernameWithStacks(username)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
-        List<Task> tasks = taskRepository.findAllWithCourseOrderByTaskNameAsc();
+        List<Task> tasks;
+        if (InternTaskAccessService.currentUserIsAdmin()) {
+            tasks = taskRepository.findAllWithCourseAndStackOrderByTaskNameAsc();
+        } else {
+            List<Long> stackIds = intern.getStacks().stream()
+                .map(Stack::getId)
+                .collect(Collectors.toList());
+            tasks = stackIds.isEmpty()
+                ? List.of()
+                : taskRepository.findAllForInternByCourseStackIdIn(stackIds);
+        }
         List<TaskReview> reviews = taskReviewRepository
             .findAllByInternIdOrderByDateCreatedDesc(intern.getId());
         // query returns newest-first (DESC); keep existing (first seen = latest) per task

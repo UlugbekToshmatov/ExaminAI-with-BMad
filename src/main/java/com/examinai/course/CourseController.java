@@ -1,5 +1,6 @@
 package com.examinai.course;
 
+import com.examinai.stack.StackService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,9 +14,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class CourseController {
 
     private final CourseService courseService;
+    private final StackService stackService;
 
-    public CourseController(CourseService courseService) {
+    public CourseController(CourseService courseService, StackService stackService) {
         this.courseService = courseService;
+        this.stackService = stackService;
     }
 
     @GetMapping({"/mentor/courses", "/admin/courses"})
@@ -30,6 +33,7 @@ public class CourseController {
     @PreAuthorize("hasRole('MENTOR') or hasRole('ADMIN')")
     public String newForm(Model model, HttpServletRequest request) {
         model.addAttribute("courseDto", new CourseCreateDto());
+        model.addAttribute("stacks", stackService.findAll());
         model.addAttribute("baseCourseUrl", baseCourseUrl(request));
         return "admin/course-form";
     }
@@ -39,6 +43,7 @@ public class CourseController {
     public String create(@Valid @ModelAttribute("courseDto") CourseCreateDto dto,
                          BindingResult bindingResult, Model model, HttpServletRequest request) {
         if (bindingResult.hasErrors()) {
+            model.addAttribute("stacks", stackService.findAll());
             model.addAttribute("baseCourseUrl", baseCourseUrl(request));
             return "admin/course-form";
         }
@@ -55,8 +60,10 @@ public class CourseController {
             CourseCreateDto dto = new CourseCreateDto();
             dto.setCourseName(course.getCourseName());
             dto.setTechnology(course.getTechnology());
+            dto.setStackId(course.getStack().getId());
             model.addAttribute("courseDto", dto);
             model.addAttribute("courseId", id);
+            model.addAttribute("stacks", stackService.findAll());
             model.addAttribute("baseCourseUrl", baseCourseUrl(request));
             return "admin/course-form";
         } catch (IllegalArgumentException e) {
@@ -75,6 +82,7 @@ public class CourseController {
                          HttpServletRequest request) {
         if (bindingResult.hasErrors()) {
             model.addAttribute("courseId", id);
+            model.addAttribute("stacks", stackService.findAll());
             model.addAttribute("baseCourseUrl", baseCourseUrl(request));
             return "admin/course-form";
         }

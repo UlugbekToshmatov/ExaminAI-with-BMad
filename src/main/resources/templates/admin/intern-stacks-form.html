@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head><title>Intern stacks</title></head>
+<body>
+<main id="main-content" layout:fragment="content">
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="${error}"></div>
+
+    <h4 th:text="'Stacks for ' + ${user.username}">Stacks</h4>
+    <p class="text-muted">Interns only see platform tasks for courses in these stacks.</p>
+
+    <form th:action="@{/admin/users/{id}/stacks(id=${user.id})}" th:object="${stackDto}" method="post" class="col-md-5">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <div th:each="s : ${stacks}" class="form-check mb-1">
+            <input class="form-check-input" type="checkbox" th:value="${s.id}" name="stackIds" th:id="${'stacke' + s.id}"
+                   th:checked="${stackDto.stackIds != null and stackDto.stackIds.contains(s.id)}">
+            <label class="form-check-label" th:for="${'stacke' + s.id}" th:text="${s.name}">Java</label>
+        </div>
+        <div class="mt-3">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a th:href="@{/admin/users}" class="btn btn-link">Back to users</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

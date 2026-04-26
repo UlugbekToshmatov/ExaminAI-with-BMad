@@ -40,7 +40,8 @@ public interface TaskReviewRepository extends JpaRepository<TaskReview, Long> {
     @Query("""
         SELECT DISTINCT tr FROM TaskReview tr
         JOIN FETCH tr.task t
-        LEFT JOIN FETCH t.course
+        JOIN FETCH t.course c
+        JOIN FETCH c.stack
         JOIN FETCH tr.intern
         LEFT JOIN FETCH tr.issues
         WHERE tr.id = :id

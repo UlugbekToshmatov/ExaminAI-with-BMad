@@ -10,5 +10,6 @@
     <include file="changelogs/003-indexes.sql" relativeToChangelogFile="true"/>
     <include file="changelogs/004-seed-data.sql" relativeToChangelogFile="true"/>
     <include file="changelogs/005-task-review-github-fields.sql" relativeToChangelogFile="true"/>
+    <include file="changelogs/006-stacks-and-course-stack.sql" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

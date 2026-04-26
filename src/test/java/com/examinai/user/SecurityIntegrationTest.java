@@ -14,6 +14,8 @@ import com.examinai.review.ReviewSubmissionController;
 import com.examinai.review.ReviewPipelineService;
 import com.examinai.review.TaskReview;
 import com.examinai.review.TaskReviewRepository;
+import com.examinai.stack.StackService;
+import com.examinai.task.InternTaskAccessService;
 import com.examinai.task.InternTaskController;
 import com.examinai.task.TaskService;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +67,12 @@ class SecurityIntegrationTest {
 
     @MockBean
     AdminDashboardService adminDashboardService;
+
+    @MockBean
+    StackService stackService;
+
+    @MockBean
+    InternTaskAccessService internTaskAccessService;
 
     @MockBean
     ReviewPersistenceService reviewPersistenceService;

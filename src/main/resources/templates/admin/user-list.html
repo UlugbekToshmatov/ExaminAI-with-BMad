@@ -23,6 +23,7 @@
                     <th scope="col">Username</th>
                     <th scope="col">Email</th>
                     <th scope="col">Role</th>
+                    <th scope="col">Stacks</th>
                     <th scope="col">Status</th>
                     <th scope="col">Action</th>
                 </tr>
@@ -38,11 +39,17 @@
                         </span>
                     </td>
                     <td>
+                        <span th:if="${user.role.name() == 'INTERN'}" th:text="${#strings.listJoin(user.stacks.![name], ', ')}">Java</span>
+                        <span th:unless="${user.role.name() == 'INTERN'}" class="text-muted">—</span>
+                    </td>
+                    <td>
                         <span th:if="${user.active}" class="badge text-bg-success">Active</span>
                         <span th:unless="${user.active}" class="badge text-bg-secondary">Inactive</span>
                     </td>
                     <td>
-                        <form th:if="${user.active}"
+                        <a th:if="${user.active and user.role.name() == 'INTERN'}"
+                           th:href="@{/admin/users/{id}/stacks(id=${user.id})}" class="btn btn-sm btn-outline-primary me-1">Stacks</a>
+                        <form th:if="${user.active}" class="d-inline"
                               th:action="@{/admin/users/{id}/deactivate(id=${user.id})}"
                               method="post">
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">

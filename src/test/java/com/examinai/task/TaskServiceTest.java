@@ -3,6 +3,7 @@ package com.examinai.task;
 import com.examinai.course.Course;
 import com.examinai.course.CourseRepository;
 import com.examinai.review.TaskReviewRepository;
+import com.examinai.stack.Stack;
 import com.examinai.task.TaskWithReview;
 import com.examinai.user.Role;
 import com.examinai.user.UserAccount;
@@ -22,8 +23,10 @@ import com.examinai.review.ReviewStatus;
 import com.examinai.review.TaskReview;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -35,6 +38,7 @@ class TaskServiceTest {
     @Mock CourseRepository courseRepository;
     @Mock UserAccountRepository userAccountRepository;
     @Mock TaskReviewRepository taskReviewRepository;
+    @Mock InternTaskAccessService internTaskAccessService;
     @InjectMocks TaskService taskService;
 
     @AfterEach
@@ -139,10 +143,12 @@ class TaskServiceTest {
 
         when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
         when(taskRepository.findByIdWithCourseAndMentor(3L)).thenReturn(Optional.of(task));
+        doNothing().when(internTaskAccessService).assertInternReadAccessForCurrentUser(task);
 
         Task result = taskService.findForInternTaskDetail("intern", 3L);
 
         assertThat(result).isSameAs(task);
+        verify(internTaskAccessService).assertInternReadAccessForCurrentUser(task);
     }
 
     @Test
@@ -162,6 +168,7 @@ class TaskServiceTest {
 
         when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
         when(taskRepository.findByIdWithCourseAndMentor(3L)).thenReturn(Optional.of(task));
+        doNothing().when(internTaskAccessService).assertInternReadAccessForCurrentUser(task);
         when(taskReviewRepository.findAllByTask_IdAndIntern_IdOrderByDateCreatedDesc(eq(3L), eq(1L)))
             .thenReturn(List.of(newer, older));
 
@@ -172,17 +179,23 @@ class TaskServiceTest {
 
     @Test
     void findForInternByUsername_withNoReviews_returnsTasksWithNullReview() {
+        setInternContext();
         UserAccount intern = new UserAccount();
         intern.setUsername("intern");
+        Stack stack = new Stack();
+        ReflectionTestUtils.setField(stack, "id", 10L);
+        stack.setName("Java");
+        intern.setStacks(Set.of(stack));
 
         Task task1 = new Task();
         task1.setTaskName("Build REST API");
         Course course = new Course();
         course.setCourseName("Spring Boot");
+        course.setStack(stack);
         task1.setCourse(course);
 
-        when(userAccountRepository.findByUsername("intern")).thenReturn(Optional.of(intern));
-        when(taskRepository.findAllWithCourseOrderByTaskNameAsc()).thenReturn(List.of(task1));
+        when(userAccountRepository.findByUsernameWithStacks("intern")).thenReturn(Optional.of(intern));
+        when(taskRepository.findAllForInternByCourseStackIdIn(List.of(10L))).thenReturn(List.of(task1));
         when(taskReviewRepository.findAllByInternIdOrderByDateCreatedDesc(any())).thenReturn(Collections.emptyList());
 
         List<TaskWithReview> result = taskService.findForInternByUsername("intern");

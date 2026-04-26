@@ -7,6 +7,7 @@ import com.examinai.review.TaskReview;
 import com.examinai.user.UserAccount;
 import com.examinai.user.UserAccountService;
 import com.examinai.course.Course;
+import com.examinai.stack.StackService;
 import com.examinai.task.Task;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,9 @@ class AdminControllerDashboardTest {
 
     @MockBean
     AdminDashboardService adminDashboardService;
+
+    @MockBean
+    StackService stackService;
 
     @Test
     @WithMockUser(roles = "ADMIN")
