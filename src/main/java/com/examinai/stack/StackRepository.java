@@ -5,4 +5,8 @@ import java.util.List;
 
 public interface StackRepository extends JpaRepository<Stack, Long> {
     List<Stack> findAllByOrderByNameAsc();
+
+    boolean existsByName(String name);
+
+    boolean existsByNameAndIdNot(String name, Long id);
 }

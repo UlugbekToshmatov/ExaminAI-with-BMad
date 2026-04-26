@@ -32,6 +32,9 @@
                     <a class="nav-link py-1" th:href="@{/mentor/reviews}">Reviews</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+                    <a class="nav-link py-1" th:href="@{/admin/stacks}">Stacks</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('ADMIN')">
                     <a class="nav-link py-1" th:href="@{/admin/courses}">Courses</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">

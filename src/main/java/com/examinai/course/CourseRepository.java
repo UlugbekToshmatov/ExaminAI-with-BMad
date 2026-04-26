@@ -13,4 +13,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     @Query("SELECT c FROM Course c JOIN FETCH c.stack WHERE c.id = :id")
     Optional<Course> findByIdWithStack(@Param("id") Long id);
+
+    long countByStack_Id(Long stackId);
 }

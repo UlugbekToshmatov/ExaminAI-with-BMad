@@ -18,6 +18,9 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     @Query("SELECT DISTINCT u FROM UserAccount u LEFT JOIN FETCH u.stacks ORDER BY u.username ASC")
     java.util.List<UserAccount> findAllWithStacks();
 
+    @Query("SELECT COUNT(DISTINCT u) FROM UserAccount u JOIN u.stacks s WHERE s.id = :stackId")
+    long countUsersWithStack(@Param("stackId") Long stackId);
+
     List<UserAccount> findAllByRole(Role role);
     boolean existsByUsername(String username);
 }

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head><title>Stacks</title></head>
+<body>
+<main id="main-content" layout:fragment="content">
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="${error}"></div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Stacks</h4>
+        <a th:href="@{/admin/stacks/new}" class="btn btn-primary btn-sm">Create stack</a>
+    </div>
+    <p class="text-muted small">Courses and intern assignments reference stacks by name. Delete is only allowed when no course or user uses a stack.</p>
+
+    <div th:if="${#lists.isEmpty(stacks)}" class="text-muted">
+        <p>No stacks defined.</p>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(stacks)}" class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="s : ${stacks}">
+                    <td th:text="${s.name}">Java</td>
+                    <td>
+                        <a th:href="@{/admin/stacks/{id}/edit(id=${s.id})}" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                        <form th:action="@{/admin/stacks/{id}/delete(id=${s.id})}" method="post" class="d-inline">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Delete this stack? It must not be in use by any course or user.')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</body>
+</html>
